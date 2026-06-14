@@ -1,0 +1,49 @@
+{
+  "description": "Hybrid Encryption Known Answer Tests",
+  "algorithm": "RSA-OAEP-AES-GCM",
+  "tests": [
+    {
+      "id": 1,
+      "description": "1 KiB payload",
+      "plaintext_size": 1024,
+      "expected_result": "success"
+    },
+    {
+      "id": 2,
+      "description": "4 KiB payload",
+      "plaintext_size": 4096,
+      "expected_result": "success"
+    },
+    {
+      "id": 3,
+      "description": "16 KiB payload",
+      "plaintext_size": 16384,
+      "expected_result": "success"
+    },
+    {
+      "id": 4,
+      "description": "256 KiB payload",
+      "plaintext_size": 262144,
+      "expected_result": "success"
+    },
+    {
+      "id": 5,
+      "description": "1 MiB payload",
+      "plaintext_size": 1048576,
+      "expected_result": "success"
+    },
+    {
+      "id": 6,
+      "description": "Payload with AAD",
+      "plaintext_size": 1024,
+      "aad": "Additional authenticated data",
+      "expected_result": "success"
+    },
+    {
+      "id": 7,
+      "description": "Binary payload",
+      "plaintext_hex": "DEADBEEFCAFEBABE00112233445566778899AABBCCDDEEFF",
+      "expected_result": "success"
+    }
+  ]
+}

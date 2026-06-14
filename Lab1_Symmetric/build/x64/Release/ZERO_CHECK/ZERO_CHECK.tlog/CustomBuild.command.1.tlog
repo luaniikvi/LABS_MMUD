@@ -1,0 +1,10 @@
+^E:\MATMAUNGDUNG\LABS\LAB1_SYMMETRIC\BUILD\CMAKEFILES\C5D660CD37F0442EE71BC39D1F47D06D\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SE:/MatMaUngDung/Labs/Lab1_Symmetric -BE:/MatMaUngDung/Labs/Lab1_Symmetric/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CryptoLab1.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

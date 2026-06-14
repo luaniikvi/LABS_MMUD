@@ -1,0 +1,37 @@
+{
+  "description": "RSA-OAEP Known Answer Tests (NIST SP 800-56B)",
+  "algorithm": "RSA-OAEP-SHA256",
+  "tests": [
+    {
+      "id": 1,
+      "description": "Small message encryption/decryption",
+      "plaintext": "Hello, RSA-OAEP!",
+      "expected_result": "success"
+    },
+    {
+      "id": 2,
+      "description": "Empty message",
+      "plaintext": "",
+      "expected_result": "success"
+    },
+    {
+      "id": 3,
+      "description": "Maximum size message (382 bytes for RSA-3072)",
+      "plaintext_size": 382,
+      "expected_result": "success"
+    },
+    {
+      "id": 4,
+      "description": "Binary data encryption",
+      "plaintext_hex": "00112233445566778899AABBCCDDEEFF",
+      "expected_result": "success"
+    },
+    {
+      "id": 5,
+      "description": "Message with label",
+      "plaintext": "Message with OAEP label",
+      "label": "TestLabel123",
+      "expected_result": "success"
+    }
+  ]
+}

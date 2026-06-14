@@ -1,8 +1,0 @@
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/Catch2WithMain_local.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_lib.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_tests.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_bench.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/RUN_TESTS.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/ALL_BUILD.dir
-E:/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/ZERO_CHECK.dir

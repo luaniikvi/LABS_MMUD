@@ -10,6 +10,7 @@ import os
 import json
 import base64
 import ctypes
+import secrets
 import subprocess
 import threading
 import time
@@ -118,6 +119,12 @@ def configure_dll(dll):
     ]
     dll.decrypt_aes_c.restype = c_int
 
+    dll.lab1_run_kat.argtypes = [
+        c_char_p,          # vectors_file
+        c_char_p,          # error_msg
+    ]
+    dll.lab1_run_kat.restype = c_char_p
+
 
 # Auto-load DLL at startup
 dll, dll_path = load_crypto_dll()
@@ -131,11 +138,12 @@ class BenchmarkWorker(QThread):
     progress = pyqtSignal(str)
     finished = pyqtSignal(list)
     
-    def __init__(self, build_dir, mode=None, size=None):
+    def __init__(self, build_dir, mode=None, size=None, threads=None):
         super().__init__()
         self.build_dir = build_dir
         self.mode = mode
         self.size = size
+        self.threads = threads
     
     def run(self):
         try:
@@ -151,6 +159,7 @@ class BenchmarkWorker(QThread):
                 cmd.extend(["--mode", self.mode])
             if self.size:
                 cmd.extend(["--size", str(self.size)])
+            cmd.extend(["--threads", str(self.threads if self.threads is not None else 0)])
             
             self.progress.emit(f"[*] Running: {' '.join(cmd)}")
             self.progress.emit(f"[*] Build directory: {self.build_dir}")
@@ -237,6 +246,55 @@ class TestWorker(QThread):
             self.finished.emit(0, 0, 0)
 
 
+class KatWorker(QThread):
+    """Runs NIST KAT validation via DLL lab1_run_kat in a background thread"""
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(int, int, int)
+
+    def __init__(self, vectors_path):
+        super().__init__()
+        self.vectors_path = vectors_path
+
+    def run(self):
+        try:
+            self.progress.emit(f"[*] Running NIST KAT validation via DLL...")
+            self.progress.emit(f"[*] Vectors: {self.vectors_path}")
+
+            errbuf = ctypes.create_string_buffer(1024)
+            result = dll.lab1_run_kat(
+                self.vectors_path.encode(),
+                errbuf
+            )
+
+            if result:
+                output = result.decode('utf-8', errors='replace')
+                total = passed = failed = 0
+
+                for line in output.splitlines():
+                    stripped = line.rstrip()
+                    if stripped:
+                        self.progress.emit(stripped)
+                    # Parse summary: "  TOTAL: 14 | PASSED: 14 | FAILED: 0"
+                    if "TOTAL:" in stripped and "PASSED:" in stripped:
+                        try:
+                            parts = stripped.split("|")
+                            total = int(parts[0].split(":")[1].strip())
+                            passed = int(parts[1].split(":")[1].strip())
+                            failed = int(parts[2].split(":")[1].strip())
+                        except:
+                            pass
+
+                self.finished.emit(total, passed, failed)
+            else:
+                err = errbuf.value.decode('utf-8', errors='replace')
+                self.progress.emit(f"[ERROR] lab1_run_kat failed: {err}")
+                self.finished.emit(0, 0, 0)
+
+        except Exception as e:
+            self.progress.emit(f"[ERROR] KAT failed: {e}")
+            self.finished.emit(0, 0, 0)
+
+
 # ─── Stylesheet ───────────────────────────────────────────────────────────────
 QSS = """
 QMainWindow { background: #F5F7FA; }
@@ -273,12 +331,12 @@ QFrame#card {
 }
 
 /* Labels */
-QLabel { color: #1A1A2E; font-size: 13px; }
-QLabel#title_lbl  { color: #0077B6; font-size: 21px; font-weight: bold; }
-QLabel#sub_lbl    { color: #666699; font-size: 12px; font-style: italic; }
-QLabel#card_title { color: #0077B6; font-size: 14px; font-weight: bold; }
-QLabel#log_header { color: #0077B6; font-size: 12px; font-weight: bold; }
-QLabel#stat_label { color: #2D6A4F; font-size: 13px; font-weight: bold; }
+QLabel { color: #1A1A2E; font-size: 14px; }
+QLabel#title_lbl  { color: #0077B6; font-size: 23px; font-weight: bold; }
+QLabel#sub_lbl    { color: #666699; font-size: 13px; font-style: italic; }
+QLabel#card_title { color: #0077B6; font-size: 15px; font-weight: bold; }
+QLabel#log_header { color: #0077B6; font-size: 13px; font-weight: bold; }
+QLabel#stat_label { color: #2D6A4F; font-size: 14px; font-weight: bold; }
 
 /* Inputs */
 QLineEdit {
@@ -287,7 +345,7 @@ QLineEdit {
     border-radius: 4px;
     padding: 4px 8px;
     color: #1A1A2E;
-    font-size: 13px;
+    font-size: 14px;
 }
 QLineEdit:focus  { border: 1px solid #0077B6; background: #E0EEF8; }
 QLineEdit:disabled { background: #E8EBF0; color: #909090; }
@@ -298,7 +356,7 @@ QComboBox {
     border-radius: 4px;
     padding: 4px 8px;
     color: #1A1A2E;
-    font-size: 13px;
+    font-size: 14px;
     min-width: 90px;
 }
 QComboBox:focus { border: 1px solid #0077B6; }
@@ -317,7 +375,7 @@ QPushButton {
     border: none;
     border-radius: 5px;
     padding: 6px 14px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: bold;
 }
 QPushButton:hover   { background: #005F92; }
@@ -325,28 +383,28 @@ QPushButton:pressed { background: #004A73; }
 QPushButton:disabled { background: #A0A0A0; }
 QPushButton#action_btn {
     background: #2D6A4F;
-    font-size: 15px;
+    font-size: 16px;
     padding: 10px 20px;
 }
 QPushButton#action_btn:hover   { background: #40916C; }
 QPushButton#action_btn:pressed { background: #1B4332; }
 QPushButton#bench_btn {
     background: #E76F51;
-    font-size: 14px;
+    font-size: 15px;
     padding: 8px 18px;
 }
 QPushButton#bench_btn:hover   { background: #F4A261; }
 QPushButton#bench_btn:pressed { background: #E76F51; }
 QPushButton#test_btn {
     background: #6A0572;
-    font-size: 14px;
+    font-size: 15px;
     padding: 8px 18px;
 }
 QPushButton#test_btn:hover   { background: #AB83A1; }
 QPushButton#test_btn:pressed { background: #6A0572; }
 
 /* Checkboxes / Radios */
-QRadioButton, QCheckBox { color: #1A1A2E; font-size: 13px; spacing: 6px; }
+QRadioButton, QCheckBox { color: #1A1A2E; font-size: 14px; spacing: 6px; }
 
 /* Text areas */
 QTextEdit {
@@ -355,12 +413,12 @@ QTextEdit {
     border-radius: 4px;
     color: #1A1A2E;
     font-family: "Courier New";
-    font-size: 12px;
+    font-size: 13px;
 }
 QTextEdit#output_text { background: #EAF4FB; color: #0077B6; }
-QTextEdit#log_text    { background: #F8FAFF; color: #333333; font-size: 11px; }
-QTextEdit#bench_text  { background: #FFF8F0; color: #E76F51; font-size: 11px; }
-QTextEdit#test_text   { background: #F8F0FF; color: #6A0572; font-size: 11px; }
+QTextEdit#log_text    { background: #F8FAFF; color: #333333; font-size: 12px; }
+QTextEdit#bench_text  { background: #FFF8F0; color: #E76F51; font-size: 12px; }
+QTextEdit#test_text   { background: #F8F0FF; color: #6A0572; font-size: 12px; }
 
 /* Tables */
 QTableWidget {
@@ -456,6 +514,7 @@ class CryptoApp(QMainWindow):
         # Workers
         self.bench_worker = None
         self.test_worker = None
+        self.kat_worker = None
         
         self.update_ui_state()
         self._post_init()
@@ -498,6 +557,7 @@ class CryptoApp(QMainWindow):
         left_vbox = QVBoxLayout(left)
         left_vbox.setContentsMargins(0, 0, 0, 0)
         left_vbox.setSpacing(10)
+        left_vbox.addWidget(self._card_lib())
         left_vbox.addWidget(self._card_cipher())
         left_vbox.addWidget(self._card_params())
         left_vbox.addStretch()
@@ -634,10 +694,12 @@ class CryptoApp(QMainWindow):
         vbox.addWidget(QLabel("Vectors JSON Path:"))
 
         self.kat_path_entry = QLineEdit()
-        self.kat_path_entry.setPlaceholderText("Path to vectors.json…")
+        self.kat_path_entry.setPlaceholderText("Path to vectors.json\u2026")
+        _base = os.path.dirname(os.path.abspath(__file__))
         for p in ["SampleData/vectors.json", "build/vectors.json", "vectors.json"]:
-            if os.path.exists(p):
-                self.kat_path_entry.setText(os.path.abspath(p))
+            full = os.path.join(_base, p)
+            if os.path.exists(full):
+                self.kat_path_entry.setText(full)
                 break
         vbox.addWidget(self.kat_path_entry)
 
@@ -682,6 +744,14 @@ class CryptoApp(QMainWindow):
         size_row.addWidget(self.bench_size_combo)
         size_row.addStretch()
         config_vbox.addLayout(size_row)
+        
+        thread_row = QHBoxLayout()
+        thread_row.addWidget(QLabel("Threads:"))
+        self.bench_threads_combo = QComboBox()
+        self.bench_threads_combo.addItems(["Auto", "1", "2", "4", "8", "12", "16", "20", "24", "32"])
+        thread_row.addWidget(self.bench_threads_combo)
+        thread_row.addStretch()
+        config_vbox.addLayout(thread_row)
         
         btn_row = QHBoxLayout()
         self.bench_btn = QPushButton("▶ Run Benchmark")
@@ -794,10 +864,12 @@ class CryptoApp(QMainWindow):
         vbox_path.addWidget(QLabel("Vectors JSON File:"))
         path_row = QHBoxLayout()
         self.kat_path_entry = QLineEdit()
-        self.kat_path_entry.setPlaceholderText("Path to vectors.json…")
+        self.kat_path_entry.setPlaceholderText("Path to vectors.json\u2026")
+        _base = os.path.dirname(os.path.abspath(__file__))
         for p in ["SampleData/vectors.json", "build/vectors.json", "vectors.json"]:
-            if os.path.exists(p):
-                self.kat_path_entry.setText(os.path.abspath(p))
+            full = os.path.join(_base, p)
+            if os.path.exists(full):
+                self.kat_path_entry.setText(full)
                 break
         path_row.addWidget(self.kat_path_entry)
         b_browse = QPushButton("Browse")
@@ -807,12 +879,32 @@ class CryptoApp(QMainWindow):
         config_vbox.addLayout(vbox_path)
         
         btn_row = QHBoxLayout()
-        b_run = QPushButton("▶ Run KAT Validation")
-        b_run.setObjectName("action_btn")
-        b_run.clicked.connect(self.execute_kat_test)
-        btn_row.addWidget(b_run)
+        self.kat_run_btn = QPushButton("▶ Run KAT Validation")
+        self.kat_run_btn.setObjectName("action_btn")
+        self.kat_run_btn.clicked.connect(self.execute_kat_test)
+        self.kat_stop_btn = QPushButton("■ Stop")
+        self.kat_stop_btn.setEnabled(False)
+        self.kat_stop_btn.clicked.connect(self.stop_kat)
+        btn_row.addWidget(self.kat_run_btn)
+        btn_row.addWidget(self.kat_stop_btn)
         btn_row.addStretch()
         config_vbox.addLayout(btn_row)
+        
+        # Stats row
+        stats_row = QHBoxLayout()
+        self.kat_total_lbl = QLabel("Total: --")
+        self.kat_total_lbl.setObjectName("stat_label")
+        self.kat_passed_lbl = QLabel("Passed: --")
+        self.kat_passed_lbl.setObjectName("stat_label")
+        self.kat_failed_lbl = QLabel("Failed: --")
+        self.kat_failed_lbl.setObjectName("stat_label")
+        stats_row.addWidget(self.kat_total_lbl)
+        stats_row.addSpacing(20)
+        stats_row.addWidget(self.kat_passed_lbl)
+        stats_row.addSpacing(20)
+        stats_row.addWidget(self.kat_failed_lbl)
+        stats_row.addStretch()
+        config_vbox.addLayout(stats_row)
         
         vbox.addWidget(config_card)
         
@@ -1068,81 +1160,54 @@ class CryptoApp(QMainWindow):
         if not path or not os.path.exists(path):
             QMessageBox.critical(self, "File Error", f"Invalid path:\n'{path}'")
             return
-        try:
-            self._run_kat(path)
-        except Exception as e:
-            self.log(f"[!] KAT Error: {e}", "#D62828")
 
-    def _run_kat(self, path: str):
-        sep = "═" * 52
-        self.kat_log(sep, "#00B4D8")
-        self.kat_log(f"  NIST KAT: {os.path.basename(path)}")
-        self.kat_log(sep, "#00B4D8")
+        # Clean up previous worker safely
+        if self.kat_worker is not None:
+            if self.kat_worker.isRunning():
+                self.kat_worker.wait()
+            self.kat_worker.deleteLater()
 
-        try:
-            with open(path) as f:
-                data = json.load(f)
-        except Exception as e:
-            self.kat_log(f"[JSON ERROR] {e}", "#D62828")
-            return
+        self.kat_text.clear()
+        self.kat_total_lbl.setText("Total: --")
+        self.kat_passed_lbl.setText("Passed: --")
+        self.kat_failed_lbl.setText("Failed: --")
 
-        cases = data.get("test_cases", [])
-        total = passed = failed = 0
+        self.kat_worker = KatWorker(path)
+        self.kat_worker.progress.connect(self.kat_log)
+        self.kat_worker.finished.connect(self.on_kat_finished)
 
-        for tc in cases:
-            total += 1
-            tc_id    = tc.get("id", "?")
-            name     = tc.get("name", "Unnamed")
-            mode     = tc.get("mode", "")
-            expected = tc.get("expected_result", "PASS")
-            key_hex  = tc.get("key_hex", "")
-            iv_hex   = tc.get("iv_hex", "")
-            pt_str   = tc.get("plaintext", "")
-            ct_hex   = tc.get("ciphertext_hex", "")
-            tag_hex  = tc.get("tag_hex", "")
-            aad_text = tc.get("aad_text", "")
-            is_aead  = 1 if mode in ("gcm", "ccm") else 0
+        self.kat_run_btn.setEnabled(False)
+        self.kat_stop_btn.setEnabled(True)
+        self.kat_worker.start()
 
-            self.kat_log(f"  [{tc_id}] {name} → ", newline=False)
+    def stop_kat(self):
+        if self.kat_worker and self.kat_worker.isRunning():
+            self.kat_worker.terminate()
+            self.kat_worker.wait()
+            self.kat_log("[!] KAT stopped by user")
+        self.kat_run_btn.setEnabled(True)
+        self.kat_stop_btn.setEnabled(False)
 
-            try:
-                key_b  = bytes.fromhex(key_hex)
-                iv_b   = bytes.fromhex(iv_hex)  if iv_hex  else b""
-                ct_b   = bytes.fromhex(ct_hex)
-                tag_b  = bytes.fromhex(tag_hex) if tag_hex else b""
-                exp_pt = pt_str.encode()
+    def on_kat_finished(self, total, passed, failed):
+        self.kat_run_btn.setEnabled(True)
+        self.kat_stop_btn.setEnabled(False)
 
-                c_ct  = (c_ubyte * len(ct_b)).from_buffer_copy(ct_b)
-                c_key = (c_ubyte * len(key_b)).from_buffer_copy(key_b)
-                c_iv  = (c_ubyte * len(iv_b)).from_buffer_copy(iv_b)  if iv_b  else None
-                c_tag = (c_ubyte * len(tag_b)).from_buffer_copy(tag_b) if tag_b else None
-                c_pt  = (c_ubyte * (len(ct_b) + 128))()
-                c_pl  = c_int(0)
-                errbuf = ctypes.create_string_buffer(256)
+        # Safe cleanup: wait for thread exit, then schedule Qt deletion
+        worker = self.kat_worker
+        self.kat_worker = None
+        if worker is not None:
+            worker.wait()
+            worker.deleteLater()
 
-                res = dll.decrypt_aes_c(
-                    mode.encode(), c_ct, len(ct_b),
-                    c_key, len(key_b), c_iv, len(iv_b),
-                    aad_text.encode() if aad_text else None,
-                    c_tag, len(tag_b), is_aead,
-                    c_pt, byref(c_pl), errbuf
-                )
-                ok = (res == 0 and bytes(c_pt[:c_pl.value]) == exp_pt)
-            except Exception:
-                ok = False
+        self.kat_total_lbl.setText(f"Total: {total}")
+        self.kat_passed_lbl.setText(f"Passed: {passed}")
+        self.kat_failed_lbl.setText(f"Failed: {failed}")
 
-            if (expected == "PASS" and ok) or (expected == "FAIL" and not ok):
-                self.kat_log("PASS", "#2D6A4F")
-                passed += 1
-            else:
-                self.kat_log("FAIL", "#D62828")
-                failed += 1
-
-        self.kat_log(sep, "#00B4D8")
-        rate = (passed * 100 // total) if total else 0
-        self.kat_log(f"  TOTAL={total}  PASSED={passed}  FAILED={failed}", "#00B4D8")
-        self.kat_log(f"  SUCCESS RATE: {rate}%", "#2D6A4F" if rate == 100 else "#D62828")
-        self.kat_log(sep, "#00B4D8")
+        if failed == 0 and total > 0:
+            self.kat_passed_lbl.setStyleSheet("color: #2D6A4F; font-size: 13px; font-weight: bold;")
+            self.kat_failed_lbl.setStyleSheet("color: #2D6A4F; font-size: 13px; font-weight: bold;")
+        elif failed > 0:
+            self.kat_failed_lbl.setStyleSheet("color: #D62828; font-size: 13px; font-weight: bold;")
 
     # ─── Benchmark ────────────────────────────────────────────────────────────
     def run_benchmark(self):
@@ -1155,8 +1220,15 @@ class CryptoApp(QMainWindow):
             QMessageBox.critical(self, "Error", f"Build directory not found: {build_dir}")
             return
         
+        # Clean up previous worker safely
+        if self.bench_worker is not None:
+            if self.bench_worker.isRunning():
+                self.bench_worker.wait()
+            self.bench_worker.deleteLater()
+        
         mode = self.bench_mode_combo.currentText()
         size = self.bench_size_combo.currentText()
+        threads_text = self.bench_threads_combo.currentText()
         
         if mode == "All Modes":
             mode = None
@@ -1173,10 +1245,12 @@ class CryptoApp(QMainWindow):
             }
             size = size_map.get(size)
         
+        threads = 0 if threads_text == "Auto" else int(threads_text)
+        
         self.bench_text.clear()
         self.bench_log("[*] Starting benchmark...")
         
-        self.bench_worker = BenchmarkWorker(build_dir, mode, size)
+        self.bench_worker = BenchmarkWorker(build_dir, mode, size, threads)
         self.bench_worker.progress.connect(self.bench_log)
         self.bench_worker.finished.connect(self.on_benchmark_finished)
         
@@ -1195,7 +1269,13 @@ class CryptoApp(QMainWindow):
     def on_benchmark_finished(self, results):
         self.bench_btn.setEnabled(True)
         self.bench_stop_btn.setEnabled(False)
+        
+        # Safe cleanup: wait for thread exit, then schedule Qt deletion
+        worker = self.bench_worker
         self.bench_worker = None
+        if worker is not None:
+            worker.wait()
+            worker.deleteLater()
     
     def bench_log(self, message: str, color: str | None = None):
         cur = self.bench_text.textCursor()
@@ -1234,6 +1314,12 @@ class CryptoApp(QMainWindow):
             QMessageBox.critical(self, "Error", f"Build directory not found: {build_dir}")
             return
         
+        # Clean up previous worker safely
+        if self.test_worker is not None:
+            if self.test_worker.isRunning():
+                self.test_worker.wait()
+            self.test_worker.deleteLater()
+        
         self.test_text.clear()
         self.test_total_lbl.setText("Total: --")
         self.test_passed_lbl.setText("Passed: --")
@@ -1259,7 +1345,13 @@ class CryptoApp(QMainWindow):
     def on_tests_finished(self, total, passed, failed):
         self.test_btn.setEnabled(True)
         self.test_stop_btn.setEnabled(False)
+        
+        # Safe cleanup: wait for thread exit, then schedule Qt deletion
+        worker = self.test_worker
         self.test_worker = None
+        if worker is not None:
+            worker.wait()
+            worker.deleteLater()
         
         self.test_total_lbl.setText(f"Total: {total}")
         self.test_passed_lbl.setText(f"Passed: {passed}")
@@ -1279,14 +1371,18 @@ class CryptoApp(QMainWindow):
         if color:
             fmt.setForeground(QColor(color))
         else:
-            if "FAILED" in message or "[ERROR]" in message:
+            if "[FAIL]" in message or "FAILED" in message or "[ERROR]" in message:
                 fmt.setForeground(QColor("#D62828"))
+            elif "[PASS]" in message:
+                fmt.setForeground(QColor("#2D6A4F"))
             elif "passed" in message.lower() and "failed" not in message.lower():
                 fmt.setForeground(QColor("#2D6A4F"))
             elif "[+]" in message or "[SUCCESS]" in message:
                 fmt.setForeground(QColor("#2D6A4F"))
             elif "[*]" in message:
                 fmt.setForeground(QColor("#00B4D8"))
+            elif "test cases:" in message:
+                fmt.setForeground(QColor("#0077B6"))
             else:
                 fmt.setForeground(QColor("#6A0572"))
         
@@ -1339,7 +1435,11 @@ class CryptoApp(QMainWindow):
         is_aead   = 1 if mode in ("gcm", "ccm") else 0
         allow_ecb = 1 if self.allow_ecb_check.isChecked() else 0
 
-        self.log(f"[*] {direction.upper()} AES-{mode.upper()} …", "#00B4D8")
+        self.log(f"[*] {direction.upper()} AES-{mode.upper()} \u2026", "#00B4D8")
+
+        # ECB warning
+        if mode == "ecb" and direction == "encrypt":
+            self.log("[!] WARNING: ECB mode is insecure \u2014 identical blocks produce identical ciphertext.", "#D62828")
 
         try:
             key_bytes = self._parse(self.key_entry.text(), self.key_format_combo.currentText())
@@ -1351,6 +1451,25 @@ class CryptoApp(QMainWindow):
         except ValueError as e:
             QMessageBox.critical(self, "IV Error", str(e)); return
 
+        # Auto-generate key/IV when empty (encrypt only)
+        if direction == "encrypt":
+            if not key_bytes:
+                key_bytes = secrets.token_bytes(32)  # AES-256
+                self.key_entry.setText(key_bytes.hex().upper())
+                self.key_format_combo.setCurrentText("hex")
+                self.log("[+] Auto-generated key (256-bit)", "#2D6A4F")
+            if not iv_bytes and mode != "ecb":
+                iv_len = 12 if mode in ("gcm", "ccm") else 16
+                iv_bytes = secrets.token_bytes(iv_len)
+                self.iv_entry.setText(iv_bytes.hex().upper())
+                self.log(f"[+] Auto-generated IV ({iv_len * 8}-bit)", "#2D6A4F")
+        else:
+            # Decrypt requires key and IV
+            if not key_bytes:
+                QMessageBox.critical(self, "Key Required", "Decryption needs a key!"); return
+            if mode != "ecb" and not iv_bytes:
+                QMessageBox.critical(self, "IV Required", f"AES-{mode.upper()} decrypt needs IV!"); return
+
         aad_str = self.aad_entry.text() if is_aead else ""
 
         # Input bytes
@@ -1360,6 +1479,12 @@ class CryptoApp(QMainWindow):
             if not raw:
                 QMessageBox.critical(self, "Input Error", "Provide input data."); return
             in_fmt = self.input_format_combo.currentText()
+            # Warn if decrypting with text format (ciphertext is usually hex/base64)
+            if direction == "decrypt" and in_fmt == "text":
+                QMessageBox.warning(self, "Input Format",
+                    "Input format is 'text' but you are decrypting.\n"
+                    "Ciphertext should usually be 'hex' or 'base64'.\n"
+                    "Switch format if decryption fails.")
             try:
                 if in_fmt == "hex":
                     input_bytes = bytes.fromhex("".join(raw.split()))
@@ -1379,16 +1504,20 @@ class CryptoApp(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "File Error", str(e)); return
 
-        # Allocate buffers
+        # Allocate buffers (XTS doubles the size, so use 2*n + 256 for safety)
         n           = len(input_bytes)
-        out_buf     = (c_ubyte * (n + 128))()
-        out_len     = c_int(0)
-        key_out     = (c_ubyte * 64)()
-        key_out_len = c_int(0)
-        iv_out      = (c_ubyte * 16)()
-        iv_out_len  = c_int(0)
-        tag_out     = (c_ubyte * 16)()
-        tag_out_len = c_int(0)
+        out_cap     = 2 * n + 256
+        out_buf     = (c_ubyte * out_cap)()
+        out_len     = c_int(out_cap)          # DLL uses this as buffer capacity
+        key_cap     = 64
+        key_out     = (c_ubyte * key_cap)()
+        key_out_len = c_int(key_cap)           # DLL uses this as buffer capacity
+        iv_cap      = 16
+        iv_out      = (c_ubyte * iv_cap)()
+        iv_out_len  = c_int(iv_cap)            # DLL uses this as buffer capacity
+        tag_cap     = 16
+        tag_out     = (c_ubyte * tag_cap)()
+        tag_out_len = c_int(tag_cap)           # DLL uses this as buffer capacity
         errbuf      = ctypes.create_string_buffer(256)
         in_buf      = (c_ubyte * n).from_buffer_copy(input_bytes)
 
@@ -1421,11 +1550,6 @@ class CryptoApp(QMainWindow):
                 except ValueError:
                     QMessageBox.critical(self, "Tag Error", "Tag must be hex."); return
 
-            if k_len == 0:
-                QMessageBox.critical(self, "Key Required", "Decryption needs a key!"); return
-            if mode != "ecb" and i_len == 0:
-                QMessageBox.critical(self, "IV Required", f"AES-{mode} decrypt needs IV!"); return
-
             t_buf = (c_ubyte * len(tag_bytes)).from_buffer_copy(tag_bytes) if tag_bytes else None
             t_len = len(tag_bytes)
             res = dll.decrypt_aes_c(
@@ -1446,17 +1570,17 @@ class CryptoApp(QMainWindow):
 
         # Show used key/iv/tag after encrypt
         if direction == "encrypt":
-            uk = bytes(key_out[:key_out_len.value])
-            ui = bytes(iv_out[:iv_out_len.value])   if iv_out_len.value  else b""
+            uk = bytes(key_out[:key_out_len.value]) if key_out_len.value else key_bytes
+            ui = bytes(iv_out[:iv_out_len.value])   if iv_out_len.value  else iv_bytes
             ut = bytes(tag_out[:tag_out_len.value]) if tag_out_len.value else b""
             self.key_entry.setText(uk.hex().upper())
-            self.log(f"[+] Key : {uk.hex().upper()}")
+            self.log(f"[+] Key : {uk.hex().upper()}", "#2D6A4F")
             if ui:
                 self.iv_entry.setText(ui.hex().upper())
-                self.log(f"[+] IV  : {ui.hex().upper()}")
-            if is_aead:
+                self.log(f"[+] IV  : {ui.hex().upper()}", "#2D6A4F")
+            if is_aead and ut:
                 self.tag_entry.setText(ut.hex().upper())
-                self.log(f"[+] Tag : {ut.hex().upper()}")
+                self.log(f"[+] Tag : {ut.hex().upper()}", "#2D6A4F")
 
         result = bytes(out_buf[:out_len.value])
 
@@ -1469,6 +1593,7 @@ class CryptoApp(QMainWindow):
             else:  # "raw"
                 txt = result.decode('utf-8', errors="replace")
             self.text_out.setPlainText(txt)
+            self.log(f"[+] Output: {len(result)} bytes → {out_fmt}", "#2D6A4F")
         else:
             out_path = self.file_out_entry.text().strip()
             if not out_path:
@@ -1482,11 +1607,12 @@ class CryptoApp(QMainWindow):
                 self.log(f"[+] Saved {len(result):,} bytes → {out_path}", "#2D6A4F")
 
                 if direction == "encrypt":
-                    uk  = bytes(key_out[:key_out_len.value])
-                    ui  = bytes(iv_out[:iv_out_len.value])   if iv_out_len.value  else b""
+                    uk  = bytes(key_out[:key_out_len.value]) if key_out_len.value else key_bytes
+                    ui  = bytes(iv_out[:iv_out_len.value])   if iv_out_len.value  else iv_bytes
                     ut  = bytes(tag_out[:tag_out_len.value]) if tag_out_len.value else b""
+                    key_bits = len(uk) * 8
                     meta = {
-                        "alg":  f"AES-{key_out_len.value * 8}-{mode.upper()}",
+                        "alg":  f"AES-{key_bits}-{mode.upper()}",
                         "mode": mode,
                         "iv":   ui.hex().upper(),
                         "aad":  aad_str,

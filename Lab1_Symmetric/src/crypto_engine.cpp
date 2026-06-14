@@ -18,7 +18,12 @@
 #include <stdint.h>
 #include <algorithm>
 
-static std::set<std::string> usedKeyNonceRegistry;
+// Function-local static avoids static-init-order crash when tests.cpp's
+// NonceRegistryCleanup runs before this TU's file-scope statics are constructed.
+static std::set<std::string>& GetNonceRegistry() {
+    static std::set<std::string> reg;
+    return reg;
+}
 static bool persistentRegistryLoaded = false;
 static const char* NONCE_REGISTRY_FILE = ".aestool_nonce_registry.json";
 
@@ -53,7 +58,7 @@ static void LoadPersistentNonceRegistry() {
         }
         for (const auto& entry : j["entries"]) {
             if (entry.contains("key") && entry.contains("nonce")) {
-                usedKeyNonceRegistry.insert(entry["key"].get<std::string>() + "||" + entry["nonce"].get<std::string>());
+                GetNonceRegistry().insert(entry["key"].get<std::string>() + "||" + entry["nonce"].get<std::string>());
             }
         }
     } catch (...) {
@@ -94,7 +99,7 @@ void CheckKeyNonceReuse(const CryptoConfig& config) {
 
     LoadPersistentNonceRegistry();
     const std::string token = MakeKeyNonceToken(config.key, config.iv);
-    if (usedKeyNonceRegistry.count(token)) {
+    if (GetNonceRegistry().count(token)) {
         throw std::runtime_error("CRITICAL SECURITY VIOLATION: Detected reuse of (Key, Nonce) pair!");
     }
 }
@@ -105,13 +110,13 @@ void RegisterKeyNonceUse(const CryptoConfig& config) {
     }
 
     const std::string token = MakeKeyNonceToken(config.key, config.iv);
-    if (usedKeyNonceRegistry.insert(token).second) {
+    if (GetNonceRegistry().insert(token).second) {
         AppendPersistentNonceEntry(config.key, config.iv, config.mode);
     }
 }
 
 void ClearNonceRegistry() {
-    usedKeyNonceRegistry.clear();
+    GetNonceRegistry().clear();
     persistentRegistryLoaded = true;  // prevent re-loading from file
 }
 

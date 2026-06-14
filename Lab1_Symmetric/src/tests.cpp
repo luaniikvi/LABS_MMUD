@@ -18,6 +18,50 @@
 #include <stdexcept>
 #include <iostream>
 
+// ---------------------------------------------------------------------------
+// Verbose listener — prints each test case name + PASS/FAIL
+// Listeners in Catch2 v3 must accept IConfig const* in the constructor.
+// ---------------------------------------------------------------------------
+class VerboseListener : public Catch::IEventListener {
+public:
+    explicit VerboseListener(Catch::IConfig const* config) : IEventListener(config) {}
+    ~VerboseListener() override = default;
+
+    static std::string getDescription() { return "Verbose per-test output"; }
+
+    // --- The only event we care about ---
+    void testCaseEnded(Catch::TestCaseStats const& stats) override {
+        bool ok = stats.totals.testCases.allOk();
+        std::cout << (ok ? "[PASS] " : "[FAIL] ")
+                  << stats.testInfo->name << "\n";
+    }
+
+    // --- Required no-ops ---
+    void testRunStarting(Catch::TestRunInfo const&) override {}
+    void testRunEnded(Catch::TestRunStats const&) override {}
+    void testCaseStarting(Catch::TestCaseInfo const&) override {}
+    void testCasePartialStarting(Catch::TestCaseInfo const&, uint64_t) override {}
+    void testCasePartialEnded(Catch::TestCaseStats const&, uint64_t) override {}
+    void sectionStarting(Catch::SectionInfo const&) override {}
+    void sectionEnded(Catch::SectionStats const&) override {}
+    void assertionStarting(Catch::AssertionInfo const&) override {}
+    void assertionEnded(Catch::AssertionStats const&) override {}
+    void benchmarkPreparing(Catch::StringRef) override {}
+    void benchmarkStarting(Catch::BenchmarkInfo const&) override {}
+    void benchmarkEnded(Catch::BenchmarkStats<> const&) override {}
+    void benchmarkFailed(Catch::StringRef) override {}
+    void skipTest(Catch::TestCaseInfo const&) override {}
+    void noMatchingTestCases(Catch::StringRef) override {}
+    void reportInvalidTestSpec(Catch::StringRef) override {}
+    void fatalErrorEncountered(Catch::StringRef) override {}
+    void listReporters(std::vector<Catch::ReporterDescription> const&) override {}
+    void listListeners(std::vector<Catch::ListenerDescription> const&) override {}
+    void listTests(std::vector<Catch::TestCaseHandle> const&) override {}
+    void listTags(std::vector<Catch::TagInfo> const&) override {}
+};
+
+CATCH_REGISTER_LISTENER(VerboseListener)
+
 // Custom main to add --help before Catch2 processes arguments
 int main(int argc, char** argv) {
     // Check for --help flag before Catch2 runs

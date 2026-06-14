@@ -260,28 +260,17 @@ DLL_EXPORT const char* lab1_run_kat(
         std::streambuf* old_cout = std::cout.rdbuf(oss.rdbuf());
         std::streambuf* old_cerr = std::cerr.rdbuf(oss.rdbuf());
         
-        // Inline KAT validation
-        using namespace std;
-        
-        oss << "=== NIST KAT Validation ===" << endl;
-        oss << "Vectors file: " << vectors_file << endl;
-        
-        // Check if file exists using simple ifstream
-        ifstream test_file(vectors_file);
-        if (!test_file.good()) {
-            oss << "[ERROR] File not found: " << vectors_file << endl;
-        } else {
-            test_file.close();
-            oss << "[INFO] Full KAT validation requires CLI tool: aestool.exe --kat " << vectors_file << endl;
-            oss << "[INFO] DLL mode provides basic validation only" << endl;
-            
-            // Try to call RunKatTest if available
-            try {
+        try {
+            // Check if file exists
+            std::ifstream test_file(vectors_file);
+            if (!test_file.good()) {
+                oss << "[ERROR] File not found: " << vectors_file << std::endl;
+            } else {
+                test_file.close();
                 RunKatTest(std::string(vectors_file));
-                oss << "[PASS] KAT validation completed" << endl;
-            } catch (const exception& e) {
-                oss << "[WARN] KAT validation warning: " << e.what() << endl;
             }
+        } catch (const std::exception& e) {
+            oss << "[ERROR] KAT validation failed: " << e.what() << std::endl;
         }
         
         std::cout.rdbuf(old_cout);
@@ -318,16 +307,18 @@ DLL_EXPORT int encrypt_aes_c(
         // Clear error
         if (err_msg_out) err_msg_out[0] = '\0';
         
-        // Validate parameters
-        if (!mode || !plaintext || plaintext_len <= 0 || !key || key_len <= 0) {
-            if (err_msg_out) strncpy(err_msg_out, "Invalid parameters", 1023);
+        // Validate parameters (key can be empty for auto-generation)
+        if (!mode || !plaintext || plaintext_len <= 0) {
+            if (err_msg_out) strncpy(err_msg_out, "Invalid parameters: mode, plaintext required", 1023);
             return -1;
         }
         
         // Build config
         CryptoConfig config;
         config.mode = mode;
-        config.key.assign(key, key + key_len);
+        if (key && key_len > 0) {
+            config.key.assign(key, key + key_len);
+        }
         
         if (iv && iv_len > 0) {
             config.iv.assign(iv, iv + iv_len);
@@ -398,9 +389,9 @@ DLL_EXPORT int decrypt_aes_c(
     uint8_t* key, int key_len,
     uint8_t* iv, int iv_len,
     const char* aad,
+    uint8_t* tag_in, int tag_len_in,
     int is_aead,
     uint8_t* plaintext_out, int* plaintext_len_out,
-    uint8_t* tag_in, int tag_len_in,
     char* err_msg_out
 ) {
     try {

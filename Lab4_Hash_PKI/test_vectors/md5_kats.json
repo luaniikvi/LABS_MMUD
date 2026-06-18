@@ -1,0 +1,55 @@
+{
+    "algorithm": "MD5",
+    "description": "MD5 Known Answer Tests (RFC 1321)",
+    "tests": [
+        {
+            "id": 1,
+            "algo": "md5",
+            "description": "MD5 empty string",
+            "input": "",
+            "expected_hex": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        {
+            "id": 2,
+            "algo": "md5",
+            "description": "MD5 'a'",
+            "input": "a",
+            "expected_hex": "0cc175b9c0f1b6a831c399e269772661"
+        },
+        {
+            "id": 3,
+            "algo": "md5",
+            "description": "MD5 'abc'",
+            "input": "abc",
+            "expected_hex": "900150983cd24fb0d6963f7d28e17f72"
+        },
+        {
+            "id": 4,
+            "algo": "md5",
+            "description": "MD5 'message digest'",
+            "input": "message digest",
+            "expected_hex": "f96b697d7cb7938d525a2f31aaf161d0"
+        },
+        {
+            "id": 5,
+            "algo": "md5",
+            "description": "MD5 alphabet",
+            "input": "abcdefghijklmnopqrstuvwxyz",
+            "expected_hex": "c3fcd3d76192e4007dfb496cca67e13b"
+        },
+        {
+            "id": 6,
+            "algo": "md5",
+            "description": "MD5 mixed case alphanumeric",
+            "input": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+            "expected_hex": "d174ab98d277d9f5a5611c2c9f419d9f"
+        },
+        {
+            "id": 7,
+            "algo": "md5",
+            "description": "MD5 numeric sequence",
+            "input": "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+            "expected_hex": "57edf4a22be3c955ac49da2e2107b67a"
+        }
+    ]
+}

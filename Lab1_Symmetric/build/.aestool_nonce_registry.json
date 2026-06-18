@@ -1,0 +1,9 @@
+{
+  "entries": [
+    {
+      "key": "00112233445566778899AABBCCDDEEFF",
+      "mode": "gcm",
+      "nonce": "00112233445566778899AABB"
+    }
+  ]
+}

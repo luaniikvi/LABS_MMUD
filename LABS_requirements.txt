@@ -66,6 +66,7 @@ mytool <command>
        [--threads N]
        [--kat path/to/vectors.json]
        [--verbose]
+       [--help]
 Programs must:
 •	Accept UTF-8 input
 •	Produce UTF-8 output

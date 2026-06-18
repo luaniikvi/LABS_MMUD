@@ -28,5 +28,8 @@ std::string bytes_to_string(const std::vector<uint8_t>& bytes);
 // Error handling
 void fail_closed(const std::string& message);
 
+// File existence check
+bool file_exists(const std::string& path);
+
 } // namespace utils
 } // namespace lab3

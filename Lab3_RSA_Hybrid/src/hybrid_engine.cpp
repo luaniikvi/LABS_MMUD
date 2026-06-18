@@ -51,18 +51,16 @@ void encrypt_hybrid(const CryptoPP::RSA::PublicKey& pub_key,
     std::vector<uint8_t> tag(16); // 128-bit tag
 
     CryptoPP::GCM<CryptoPP::AES>::Encryption encryption;
-    encryption.SetKeyWithIV(aes_key.data(), aes_key.size(), iv.data(), iv.size());
+    encryption.SetKeyWithIV(aes_key.data(), static_cast<int>(aes_key.size()), iv.data(), static_cast<int>(iv.size()));
 
-    // Process AAD if provided
-    if (!aad.empty()) {
-        encryption.SpecifyDataLengths(0, plaintext.size(), aad.size());
-        encryption.Update(aad.data(), aad.size());
-    } else {
-        encryption.SpecifyDataLengths(0, plaintext.size(), 0);
-    }
-
-    encryption.ProcessData(ciphertext.data(), plaintext.data(), plaintext.size());
-    encryption.Final(tag.data());
+    // Use EncryptAndAuthenticate for correct AAD + plaintext + tag generation
+    encryption.EncryptAndAuthenticate(
+        ciphertext.data(),
+        tag.data(), static_cast<int>(tag.size()),
+        iv.data(), static_cast<int>(iv.size()),
+        aad.empty() ? nullptr : aad.data(), aad.size(),
+        plaintext.data(), plaintext.size()
+    );
 
     std::cout << "[INFO] Encrypted " << plaintext.size() << " bytes with AES-256-GCM" << std::endl;
 
@@ -108,8 +106,8 @@ void decrypt_hybrid(const CryptoPP::RSA::PrivateKey& priv_key,
         
         bool verified = decryption.DecryptAndVerify(
             decrypted.data(),
-            tag.data(), tag.size(),
-            env.iv.data(), env.iv.size(),
+            tag.data(), static_cast<int>(tag.size()),
+            env.iv.data(), static_cast<int>(env.iv.size()),
             env.aad.empty() ? nullptr : env.aad.data(),
             env.aad.size(),
             env.ciphertext.data(),

@@ -23,9 +23,17 @@ CryptoPP::RSA::PrivateKey load_private_key(const std::string& file);
 void save_public_key_pem(const CryptoPP::RSA::PublicKey& key, const std::string& file);
 void save_private_key_pem(const CryptoPP::RSA::PrivateKey& key, const std::string& file);
 
+// Save keys in DER format (binary ASN.1)
+void save_public_key_der(const CryptoPP::RSA::PublicKey& key, const std::string& file);
+void save_private_key_der(const CryptoPP::RSA::PrivateKey& key, const std::string& file);
+
 // Load keys from PEM format
 CryptoPP::RSA::PublicKey load_public_key_pem(const std::string& file);
 CryptoPP::RSA::PrivateKey load_private_key_pem(const std::string& file);
+
+// Load keys from DER format
+CryptoPP::RSA::PublicKey load_public_key_der(const std::string& file);
+CryptoPP::RSA::PrivateKey load_private_key_der(const std::string& file);
 
 // RSA-OAEP encryption
 std::vector<uint8_t> encrypt(const CryptoPP::RSA::PublicKey& pub_key,

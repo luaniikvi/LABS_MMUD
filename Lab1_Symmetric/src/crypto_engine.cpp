@@ -196,7 +196,7 @@ std::vector<uint8_t> EncryptAES(const std::vector<uint8_t>& plaintext, CryptoCon
         ciphertext.resize(plaintext.size());
         outTag.resize(16);
         enc.EncryptAndAuthenticate(ciphertext.data(), outTag.data(), outTag.size(),
-                                   config.iv.data(), config.iv.size(),
+                                   config.iv.data(), static_cast<int>(config.iv.size()),
                                    (const byte*)config.aad.data(), config.aad.size(),
                                    plaintext.data(), plaintext.size());
     }
@@ -211,7 +211,7 @@ std::vector<uint8_t> EncryptAES(const std::vector<uint8_t>& plaintext, CryptoCon
         ciphertext.resize(plaintext.size());
         outTag.resize(16);
         enc.EncryptAndAuthenticate(ciphertext.data(), outTag.data(), outTag.size(),
-                                   config.iv.data(), config.iv.size(),
+                                   config.iv.data(), static_cast<int>(config.iv.size()),
                                    (const byte*)config.aad.data(), config.aad.size(),
                                    plaintext.data(), plaintext.size());
     }
@@ -296,7 +296,7 @@ std::vector<uint8_t> DecryptAES(const std::vector<uint8_t>& ciphertext, const Cr
             dec.SetKeyWithIV(config.key.data(), config.key.size(), config.iv.data(), config.iv.size());
             decrypted.resize(ciphertext.size());
             if (!dec.DecryptAndVerify(decrypted.data(), tag.data(), tag.size(),
-                                     config.iv.data(), config.iv.size(),
+                                     config.iv.data(), static_cast<int>(config.iv.size()),
                                      (const byte*)config.aad.data(), config.aad.size(),
                                      ciphertext.data(), ciphertext.size())) {
                 decrypted.clear();
@@ -316,7 +316,7 @@ std::vector<uint8_t> DecryptAES(const std::vector<uint8_t>& ciphertext, const Cr
             dec.SpecifyDataLengths(config.aad.size(), ciphertext.size());
             decrypted.resize(ciphertext.size());
             if (!dec.DecryptAndVerify(decrypted.data(), tag.data(), tag.size(),
-                                     config.iv.data(), config.iv.size(),
+                                     config.iv.data(), static_cast<int>(config.iv.size()),
                                      (const byte*)config.aad.data(), config.aad.size(),
                                      ciphertext.data(), ciphertext.size())) {
                 decrypted.clear();

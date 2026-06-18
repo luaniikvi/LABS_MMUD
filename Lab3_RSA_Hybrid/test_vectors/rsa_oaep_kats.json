@@ -16,8 +16,8 @@
     },
     {
       "id": 3,
-      "description": "Maximum size message (382 bytes for RSA-3072)",
-      "plaintext_size": 382,
+      "description": "Maximum size message (318 bytes for RSA-3072 with SHA-256)",
+      "plaintext_size": 318,
       "expected_result": "success"
     },
     {

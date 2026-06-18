@@ -24,4 +24,5 @@ enable_testing()
 
 # Add Labs
 add_subdirectory(Lab1_Symmetric)
-padd_subdirectory(Lab3_RSA_Hybrid)
+add_subdirectory(Lab3_RSA_Hybrid)
+add_subdirectory(Lab4_Hash_PKI)

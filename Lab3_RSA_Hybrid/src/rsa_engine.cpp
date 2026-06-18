@@ -6,6 +6,8 @@
 #include <cryptopp/files.h>
 #include <cryptopp/base64.h>
 #include <cryptopp/oids.h>
+#include <cryptopp/algparam.h>
+#include <cryptopp/argnames.h>
 #include <stdexcept>
 #include <fstream>
 #include <iostream>
@@ -87,7 +89,7 @@ void save_public_key_pem(const CryptoPP::RSA::PublicKey& key, const std::string&
     encoder.MessageEnd();
     
     // Write PEM footer
-    std::string footer = "\n-----END RSA PUBLIC KEY-----\n";
+    std::string footer = "-----END RSA PUBLIC KEY-----\n";
     fileSink.Put(reinterpret_cast<const CryptoPP::byte*>(footer.data()), footer.size());
     fileSink.MessageEnd();
 }
@@ -112,7 +114,7 @@ void save_private_key_pem(const CryptoPP::RSA::PrivateKey& key, const std::strin
     encoder.MessageEnd();
     
     // Write PEM footer
-    std::string footer = "\n-----END RSA PRIVATE KEY-----\n";
+    std::string footer = "-----END RSA PRIVATE KEY-----\n";
     fileSink.Put(reinterpret_cast<const CryptoPP::byte*>(footer.data()), footer.size());
     fileSink.MessageEnd();
 }
@@ -179,6 +181,34 @@ CryptoPP::RSA::PrivateKey load_private_key(const std::string& file) {
     return load_private_key_pem(file);
 }
 
+// ============================================================================
+// DER Format (binary ASN.1)
+// ============================================================================
+
+void save_public_key_der(const CryptoPP::RSA::PublicKey& key, const std::string& file) {
+    CryptoPP::FileSink sink(file.c_str(), true);
+    key.DEREncode(sink);
+}
+
+void save_private_key_der(const CryptoPP::RSA::PrivateKey& key, const std::string& file) {
+    CryptoPP::FileSink sink(file.c_str(), true);
+    key.DEREncode(sink);
+}
+
+CryptoPP::RSA::PublicKey load_public_key_der(const std::string& file) {
+    CryptoPP::FileSource source(file.c_str(), true);
+    CryptoPP::RSA::PublicKey key;
+    key.BERDecode(source);
+    return key;
+}
+
+CryptoPP::RSA::PrivateKey load_private_key_der(const std::string& file) {
+    CryptoPP::FileSource source(file.c_str(), true);
+    CryptoPP::RSA::PrivateKey key;
+    key.BERDecode(source);
+    return key;
+}
+
 std::vector<uint8_t> encrypt(const CryptoPP::RSA::PublicKey& pub_key,
                               const std::vector<uint8_t>& plaintext,
                               const std::string& label) {
@@ -194,13 +224,19 @@ std::vector<uint8_t> encrypt(const CryptoPP::RSA::PublicKey& pub_key,
     
     CryptoPP::RSAES<CryptoPP::OAEP<CryptoPP::SHA256>>::Encryptor encryptor(pub_key);
     
-    std::vector<uint8_t> ciphertext(encryptor.CiphertextLength(plaintext.size()));
+    size_t ct_size = encryptor.CiphertextLength(plaintext.size());
+    std::vector<uint8_t> ciphertext(ct_size);
     
-    CryptoPP::ArraySource(
-        plaintext.data(), plaintext.size(), true,
-        new CryptoPP::PK_EncryptorFilter(rng, encryptor,
-            new CryptoPP::ArraySink(ciphertext.data(), ciphertext.size()))
-    );
+    // Encrypt directly with OAEP label via NameValuePairs (avoids AssignFrom key corruption)
+    if (!label.empty()) {
+        CryptoPP::AlgorithmParameters params = CryptoPP::MakeParameters(
+            CryptoPP::Name::EncodingParameters(),
+            CryptoPP::ConstByteArrayParameter(
+                reinterpret_cast<const CryptoPP::byte*>(label.data()), label.size()));
+        encryptor.Encrypt(rng, plaintext.data(), plaintext.size(), ciphertext.data(), params);
+    } else {
+        encryptor.Encrypt(rng, plaintext.data(), plaintext.size(), ciphertext.data());
+    }
     
     return ciphertext;
 }
@@ -222,24 +258,28 @@ std::vector<uint8_t> decrypt(const CryptoPP::RSA::PrivateKey& priv_key,
     
     // Allocate buffer for plaintext
     size_t max_plaintext = decryptor.MaxPlaintextLength(ciphertext.size());
-    std::vector<uint8_t> plaintext(max_plaintext);
     
-    // Decrypt using PK_DecryptorFilter
+    // Decrypt using PK_DecryptorFilter with OAEP label
     CryptoPP::SecByteBlock recovered(max_plaintext);
     
-    CryptoPP::DecodingResult result = decryptor.Decrypt(
-        rng,
-        ciphertext.data(),
-        ciphertext.size(),
-        recovered.data()
-    );
+    // Decrypt with OAEP label via NameValuePairs
+    CryptoPP::DecodingResult result;
+    if (!label.empty()) {
+        CryptoPP::AlgorithmParameters params = CryptoPP::MakeParameters(
+            CryptoPP::Name::EncodingParameters(),
+            CryptoPP::ConstByteArrayParameter(
+                reinterpret_cast<const CryptoPP::byte*>(label.data()), label.size()));
+        result = decryptor.Decrypt(rng, ciphertext.data(), ciphertext.size(), recovered.data(), params);
+    } else {
+        result = decryptor.Decrypt(rng, ciphertext.data(), ciphertext.size(), recovered.data());
+    }
     
     if (!result.isValidCoding) {
-        utils::fail_closed("RSA-OAEP decryption failed: invalid padding or wrong key");
+        utils::fail_closed("RSA-OAEP decryption failed: invalid padding, wrong key, or wrong label");
     }
     
     // Resize to actual message length
-    plaintext.assign(recovered.begin(), recovered.begin() + result.messageLength);
+    std::vector<uint8_t> plaintext(recovered.begin(), recovered.begin() + result.messageLength);
     return plaintext;
 }
 

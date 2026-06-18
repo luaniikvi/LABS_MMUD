@@ -139,6 +139,11 @@ target_link_libraries(aestool_lib PRIVATE
     ${CRYPTOPP_LIB}
 )
 
+# MinGW: statically link runtime to avoid missing libgcc/libstdc++/libwinpthread DLLs
+if(MINGW)
+    target_link_options(aestool_lib PRIVATE -static-libgcc -static-libstdc++ -static -lpthread)
+endif()
+
 target_compile_definitions(aestool_lib PRIVATE
     BUILDING_DLL
 )

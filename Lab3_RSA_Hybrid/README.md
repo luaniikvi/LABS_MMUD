@@ -31,7 +31,7 @@ This lab implements RSA-OAEP encryption/decryption and hybrid encryption (RSA-OA
 cd Lab3_RSA_Hybrid
 mkdir build_msvc
 cd build_msvc
-cmake .. -G "Visual Studio 17 2022" -A x64
+cmake ..
 cmake --build . --config Release
 ```
 
@@ -43,7 +43,7 @@ Open MSYS2 MinGW64 terminal:
 cd Lab3_RSA_Hybrid
 mkdir build_mingw
 cd build_mingw
-cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake ..
 cmake --build .
 ```
 
@@ -89,8 +89,12 @@ python gui_qt6.py
 - **Key Generation**: Generate RSA-3072/4096 key pairs
 - **Encryption**: Encrypt text or files using RSA-OAEP or hybrid mode
 - **Decryption**: Decrypt RSA-OAEP or hybrid envelopes
+- **Hybrid Mode**: Dedicated hybrid encrypt/decrypt with AAD support, envelope inspection, and mode auto-detection
+- **Benchmark**: Run performance benchmarks for RSA key generation, RSA-OAEP, and hybrid encryption with statistical output
+- **Catch2 Tests**: Run the full Catch2 unit test suite including RSA-OAEP, hybrid, negative, encoding, and DER tests
+- **KAT Tests**: Run Known Answer Tests against `rsa_oaep_kats.json` and `hybrid_kats.json` vector files
 - **OAEP Label Support**: Optional label parameter
-- **Background Processing**: Non-blocking crypto operations
+- **Background Processing**: Non-blocking crypto operations via QThread
 - **Output Log**: Real-time operation logging
 
 ## CLI Usage
@@ -185,27 +189,126 @@ The benchmark measures:
 - Hybrid encryption/decryption throughput
 - Statistical metrics: mean, median, std dev, 95% CI
 
-Payload sizes tested: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB
+Payload sizes tested: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB, 100 MiB
 
-## Envelope Format
+## Hybrid Encryption
 
-Hybrid encryption produces a binary envelope with this structure:
+### Overview
+
+Hybrid encryption combines the strengths of asymmetric (RSA-OAEP) and symmetric (AES-256-GCM) cryptography. RSA is used only to securely transport a randomly generated AES session key, while the actual payload is encrypted with high-throughput AES-GCM. This architecture eliminates RSA's plaintext-size limitation and provides authenticated encryption for arbitrarily large data.
+
+### Architecture Flow
 
 ```
-[4 bytes: header size][JSON header][AES-GCM ciphertext]
+ENCRYPTION (Sender):
+  1. Generate random 256-bit AES session key
+  2. Wrap (encrypt) AES key with RSA-OAEP using recipient's public key
+  3. Generate random 96-bit IV (nonce)
+  4. Encrypt payload with AES-256-GCM (key + IV)
+  5. Compute 128-bit GCM authentication tag
+  6. Package into binary envelope: [header_size][JSON header][ciphertext]
+
+DECRYPTION (Recipient):
+  1. Parse envelope → extract wrapped key, IV, tag, AAD, ciphertext
+  2. Unwrap (decrypt) AES key with RSA-OAEP using private key
+  3. Decrypt ciphertext with AES-256-GCM (key + IV + tag)
+  4. Verify GCM authentication tag (rejects tampered data)
+  5. Output plaintext
 ```
 
-JSON header example:
-```json
-{
-  "mode": "RSA-OAEP-AES-GCM",
-  "rsa_modulus": 3072,
-  "hash": "SHA-256",
-  "wrapped_key": "<base64>",
-  "iv": "<base64>",
-  "tag": "<base64>",
-  "aad": "<base64 or empty>"
-}
+### Auto-Mode Selection
+
+The tool automatically selects between direct RSA-OAEP and hybrid encryption:
+
+| Condition | Mode Selected |
+|-----------|---------------|
+| Plaintext ≤ max size (318 bytes for RSA-3072) AND no AAD | **Direct RSA-OAEP** |
+| Plaintext > max size | **Hybrid (RSA-OAEP + AES-GCM)** |
+| AAD provided (any plaintext size) | **Hybrid (RSA-OAEP + AES-GCM)** |
+
+Max plaintext sizes:
+- **RSA-3072**: `384 - 2×32 - 2 = 318 bytes`
+- **RSA-4096**: `512 - 2×32 - 2 = 446 bytes`
+
+### AAD (Additional Authenticated Data)
+
+Hybrid mode supports optional AAD — data that is authenticated (integrity-checked) but **not encrypted**. This is useful for binding metadata (e.g., message type, sender ID, protocol version) to the ciphertext without hiding it.
+
+```bash
+# Encrypt with AAD string
+rsatool encrypt --in data.bin --pub pub.pem --out env.bin --aad-text "protocol=v2;sender=alice"
+
+# Encrypt with AAD from file
+rsatool encrypt --in data.bin --pub pub.pem --out env.bin --aad metadata.bin
+```
+
+AAD is stored in the envelope header (base64-encoded). During decryption, the embedded AAD is automatically used for GCM tag verification. If the envelope is tampered with or AAD is modified, decryption fails with an authentication error.
+
+### OAEP Label in Hybrid Mode
+
+The OAEP label is cryptographically bound to the RSA key-wrapping step. If a label is used during encryption, the **same label must be provided during decryption** — otherwise RSA-OAEP unwrapping fails, and the AES key cannot be recovered.
+
+```bash
+# Hybrid with label
+rsatool encrypt --in large.bin --pub pub.pem --out env.bin --label "session-42"
+rsatool decrypt --in env.bin --priv priv.pem --out out.bin --label "session-42"
+```
+
+### Security Properties
+
+| Property | Value |
+|----------|-------|
+| Key wrapping | RSA-OAEP-3072 (SHA-256, MGF1) |
+| Payload cipher | AES-256-GCM |
+| Session key | 256-bit random (fresh per encryption) |
+| IV / Nonce | 96-bit random (unique per encryption) |
+| Auth tag | 128-bit GCM tag |
+| AAD support | Yes (authenticated, not encrypted) |
+| Confidentiality | IND-CCA2 (via RSA-OAEP) + IND-CPA (via AES-GCM) |
+| Integrity | 128-bit GCM authentication tag |
+| Forward secrecy | Per-message random AES key |
+
+### Performance Characteristics
+
+Hybrid encryption throughput is dominated by AES-GCM performance (fast, hardware-accelerated on modern CPUs). RSA overhead is constant (~384 bytes for key wrapping) regardless of payload size, making hybrid mode efficient for large files:
+
+| Payload Size | Typical Throughput | RSA Overhead |
+|-------------|--------------------|-------------|
+| 1 KiB       | ~hundreds of MB/s  | ~384 bytes  |
+| 1 MiB       | ~GB/s (AES-NI)     | ~384 bytes  |
+| 100 MiB     | ~GB/s (AES-NI)     | ~384 bytes  |
+
+### Envelope Binary Format
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  [4 bytes]  header_size (uint32, little-endian)                    │
+├────────────────────────────────────────────────────────────────────┤
+│  [header_size bytes]  JSON header (UTF-8)                          │
+│    {                                                               │
+│      "mode":        "RSA-OAEP-AES-GCM",                            │
+│      "rsa_modulus": 3072,                                          │
+│      "hash":        "SHA-256",                                     │
+│      "wrapped_key": "<base64 RSA-encrypted AES key>",              │
+│      "iv":          "<base64 96-bit nonce>",                       │
+│      "tag":         "<base64 128-bit GCM tag>",                    │
+│      "aad":         "<base64 AAD or empty string>"                 │
+│    }                                                               │
+├────────────────────────────────────────────────────────────────────┤
+│  [remaining bytes]  AES-GCM ciphertext (raw binary)                │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### KAT Validation (Hybrid)
+
+Hybrid KAT vectors are in `test_vectors/hybrid_kats.json` and cover:
+- Various payload sizes: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB
+- Payloads with AAD
+- Binary payloads (raw hex)
+
+Run hybrid KATs:
+```bash
+rsatool --kat test_vectors/hybrid_kats.json
 ```
 
 ## Security Properties
@@ -214,24 +317,19 @@ JSON header example:
 - **IND-CCA2 secure**: Optimal Asymmetric Encryption Padding
 - **Hash**: SHA-256
 - **MGF**: MGF1 with SHA-256
-- **Max plaintext**: k - 2*hLen - 2 bytes (382 bytes for RSA-3072)
+- **Max plaintext**: k - 2*hLen - 2 bytes (318 bytes for RSA-3072)
 
-### Hybrid Mode
-- **Key wrapping**: RSA-OAEP-3072 with SHA-256
-- **Data encryption**: AES-256-GCM
-- **IV**: 96-bit random nonce per encryption
-- **Authentication**: 128-bit GCM tag
-- **AAD**: Optional additional authenticated data
-
-## Negative Testing
+### Negative Testing
 
 The implementation includes comprehensive negative tests:
-- ✅ Wrong key decryption → fails securely
+- ✅ Wrong key decryption → fails securely (RSA padding error / GCM auth failure)
 - ✅ Tampered ciphertext (RSA) → padding validation failure
 - ✅ Tampered ciphertext (AES-GCM) → authentication tag failure
+- ✅ Tampered envelope header → decryption rejected
+- ✅ Wrong OAEP label → unwrapping failure in both RSA and hybrid modes
 - ✅ Plaintext too large for direct RSA → fails with clear error
 - ✅ Invalid ciphertext length → rejection
-- ✅ Malformed PEM keys → parsing failure
+- ✅ Malformed / corrupted PEM keys → parsing failure
 
 ## Project Structure
 

@@ -1,0 +1,2 @@
+/mingw64/bin/ar.exe qc libCatch2WithMain_local.a CMakeFiles/Catch2WithMain_local.dir/include/catch2/catch_amalgamated.cpp.o
+/mingw64/bin/ranlib.exe libCatch2WithMain_local.a

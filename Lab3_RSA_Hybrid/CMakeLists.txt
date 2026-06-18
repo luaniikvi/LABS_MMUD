@@ -28,13 +28,20 @@ if(MSVC)
 elseif(MINGW)
     message(STATUS "[Lab3] Compiling with MinGW (MSYS2)")
     set(COMPILER_NAME "mingw")
+    # Statically link MinGW runtime so no libgcc/libstdc++/libwinpthread DLLs needed
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -static -lpthread")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++ -static -lpthread")
+    
+    # Find MinGW bin directory for DLL fallback copy
+    get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    message(STATUS "[Lab3] MinGW bin dir: ${MINGW_BIN_DIR}")
 else()
     message(STATUS "[Lab3] Compiling with GCC/Clang")
     set(COMPILER_NAME "gcc")
 endif()
 
 # ------------------------------------------------------------------------------
-# Catch2 — local amalgamation (copied from Lab1)
+# Catch2 — local amalgamation
 # ------------------------------------------------------------------------------
 if(NOT TARGET Catch2::Catch2WithMain)
     set(CATCH2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include/catch2")
@@ -142,7 +149,7 @@ install(TARGETS rsatool
 # ------------------------------------------------------------------------------
 # Unit Tests
 # ------------------------------------------------------------------------------
-add_executable(test_lab3
+add_executable(catch2_test
     src/tests.cpp
     src/rsa_engine.cpp
     src/rsa_engine.hpp
@@ -152,31 +159,31 @@ add_executable(test_lab3
     src/utils.hpp
 )
 
-target_include_directories(test_lab3 PRIVATE
+target_include_directories(catch2_test PRIVATE
     ${CRYPTOPP_INCLUDE_DIR}
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-target_link_libraries(test_lab3 PRIVATE
+target_link_libraries(catch2_test PRIVATE
     ${CRYPTOPP_LIB}
     Catch2::Catch2WithMain
 )
 
 # Compiler-specific warning flags
 if(MSVC)
-    target_compile_options(test_lab3 PRIVATE /W4 /WX-)
+    target_compile_options(catch2_test PRIVATE /W4 /WX-)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(test_lab3 PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
+    target_compile_options(catch2_test PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
 endif()
 
 # Register tests with CTest (manual registration for local Catch2)
 enable_testing()
-add_test(NAME Lab3_Tests COMMAND test_lab3 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME Lab3_Tests COMMAND catch2_test WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # ------------------------------------------------------------------------------
 # Benchmark executable
 # ------------------------------------------------------------------------------
-add_executable(benchmark_lab3
+add_executable(benchmark
     src/benchmark_main.cpp
     src/rsa_engine.cpp
     src/rsa_engine.hpp
@@ -187,24 +194,24 @@ add_executable(benchmark_lab3
     src/benchmark.cpp
 )
 
-target_include_directories(benchmark_lab3 PRIVATE
+target_include_directories(benchmark PRIVATE
     ${CRYPTOPP_INCLUDE_DIR}
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-target_link_libraries(benchmark_lab3 PRIVATE
+target_link_libraries(benchmark PRIVATE
     ${CRYPTOPP_LIB}
 )
 
 # Compiler-specific warning flags
 if(MSVC)
-    target_compile_options(benchmark_lab3 PRIVATE /W4 /WX-)
+    target_compile_options(benchmark PRIVATE /W4 /WX-)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(benchmark_lab3 PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
+    target_compile_options(benchmark PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
 endif()
 
 # Install benchmark
-install(TARGETS benchmark_lab3
+install(TARGETS benchmark
     RUNTIME DESTINATION bin
 )
 
@@ -243,3 +250,36 @@ set_target_properties(rsatool_lib PROPERTIES
     OUTPUT_NAME "rsatool"
     PREFIX ""
 )
+
+# ------------------------------------------------------------------------------
+# MinGW: Post-build auto-copy runtime DLLs to build directory
+# (MSVC uses static runtime — no DLLs needed)
+# ------------------------------------------------------------------------------
+if(NOT MSVC)
+    # Auto-detect MinGW bin directory from compiler path
+    get_filename_component(MINGW_RUNTIME_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+
+    # Verify DLLs exist; fallback to common MSYS2 path if not found
+    if(NOT EXISTS "${MINGW_RUNTIME_DIR}/libstdc++-6.dll")
+        if(EXISTS "C:/msys64/mingw64/bin/libstdc++-6.dll")
+            set(MINGW_RUNTIME_DIR "C:/msys64/mingw64/bin")
+        endif()
+    endif()
+    message(STATUS "[Lab3] MinGW runtime DLL dir: ${MINGW_RUNTIME_DIR}")
+
+    set(MINGW_RUNTIME_DLLS
+        "libgcc_s_seh-1.dll"
+        "libstdc++-6.dll"
+        "libwinpthread-1.dll"
+    )
+
+    foreach(_target rsatool catch2_test benchmark rsatool_lib)
+        foreach(_dll ${MINGW_RUNTIME_DLLS})
+            add_custom_command(TARGET ${_target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${MINGW_RUNTIME_DIR}/${_dll}"
+                    "$<TARGET_FILE_DIR:${_target}>/${_dll}"
+            )
+        endforeach()
+    endforeach()
+endif()

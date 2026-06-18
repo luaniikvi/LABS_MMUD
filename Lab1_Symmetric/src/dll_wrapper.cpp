@@ -56,12 +56,12 @@ DLL_EXPORT const char* lab1_encrypt(
         
         // Return hex
         g_result_buffer = ToHex(ciphertext);
-        *out_length = g_result_buffer.length();
+        *out_length = static_cast<int>(g_result_buffer.length());
         
         return g_result_buffer.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -108,18 +108,18 @@ DLL_EXPORT const char* lab1_decrypt(
         
         // Return as UTF-8 string
         g_result_buffer = BytesToString(plaintext);
-        *out_length = g_result_buffer.length();
+        *out_length = static_cast<int>(g_result_buffer.length());
         
         return g_result_buffer.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
 }
 
-DLL_EXPORT void lab1_free_string(const char* str) {
+DLL_EXPORT void lab1_free_string(const char* /*str*/) {
     // No-op for static buffer
 }
 
@@ -129,8 +129,8 @@ static thread_local std::string g_test_output;
 static thread_local std::string g_kat_output;
 
 DLL_EXPORT const char* lab1_run_benchmark(
-    const char* mode_filter,
-    int size_filter,
+    const char* /*mode_filter*/,
+    int /*size_filter*/,
     char* error_msg
 ) {
     try {
@@ -154,7 +154,7 @@ DLL_EXPORT const char* lab1_run_benchmark(
         return g_bench_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -243,7 +243,7 @@ DLL_EXPORT const char* lab1_run_tests(
         return g_test_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -280,7 +280,7 @@ DLL_EXPORT const char* lab1_run_kat(
         return g_kat_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -309,7 +309,7 @@ DLL_EXPORT int encrypt_aes_c(
         
         // Validate parameters (key can be empty for auto-generation)
         if (!mode || !plaintext || plaintext_len <= 0) {
-            if (err_msg_out) strncpy(err_msg_out, "Invalid parameters: mode, plaintext required", 1023);
+            if (err_msg_out) strncpy_s(err_msg_out, 1024, "Invalid parameters: mode, plaintext required", 1023);
             return -1;
         }
         
@@ -333,7 +333,7 @@ DLL_EXPORT int encrypt_aes_c(
         
         // Check ECB size limit
         if (config.mode == "ecb" && plaintext_len > 16384 && !config.allowEcb) {
-            if (err_msg_out) strncpy(err_msg_out, "ECB mode blocked for files >16KB. Use --allow-ecb", 1023);
+            if (err_msg_out) strncpy_s(err_msg_out, 1024, "ECB mode blocked for files >16KB. Use --allow-ecb", 1023);
             return -1;
         }
         
@@ -353,21 +353,21 @@ DLL_EXPORT int encrypt_aes_c(
         
         // Output key (if requested)
         if (key_out && key_len_out) {
-            int copy_len = std::min(config.key.size(), (size_t)*key_len_out);
+            int copy_len = static_cast<int>(std::min(static_cast<size_t>(*key_len_out), config.key.size()));
             memcpy(key_out, config.key.data(), copy_len);
             *key_len_out = copy_len;
         }
         
         // Output IV (if requested)
         if (!config.iv.empty() && iv_out && iv_len_out) {
-            int copy_len = std::min(config.iv.size(), (size_t)*iv_len_out);
+            int copy_len = static_cast<int>(std::min(static_cast<size_t>(*iv_len_out), config.iv.size()));
             memcpy(iv_out, config.iv.data(), copy_len);
             *iv_len_out = copy_len;
         }
         
         // Output tag (if AEAD and requested)
         if (!tag.empty() && tag_out && tag_len_out) {
-            int copy_len = std::min(tag.size(), (size_t)*tag_len_out);
+            int copy_len = static_cast<int>(std::min(static_cast<size_t>(*tag_len_out), tag.size()));
             memcpy(tag_out, tag.data(), copy_len);
             *tag_len_out = copy_len;
         }
@@ -376,7 +376,7 @@ DLL_EXPORT int encrypt_aes_c(
         
     } catch (const std::exception& e) {
         if (err_msg_out) {
-            strncpy(err_msg_out, e.what(), 1023);
+            strncpy_s(err_msg_out, 1024, e.what(), 1023);
             err_msg_out[1023] = '\0';
         }
         return -1;
@@ -400,7 +400,7 @@ DLL_EXPORT int decrypt_aes_c(
         
         // Validate parameters
         if (!mode || !ciphertext || ciphertext_len <= 0 || !key || key_len <= 0) {
-            if (err_msg_out) strncpy(err_msg_out, "Invalid parameters", 1023);
+            if (err_msg_out) strncpy_s(err_msg_out, 1024, "Invalid parameters", 1023);
             return -1;
         }
         
@@ -442,7 +442,7 @@ DLL_EXPORT int decrypt_aes_c(
         
     } catch (const std::exception& e) {
         if (err_msg_out) {
-            strncpy(err_msg_out, e.what(), 1023);
+            strncpy_s(err_msg_out, 1024, e.what(), 1023);
             err_msg_out[1023] = '\0';
         }
         return -1;

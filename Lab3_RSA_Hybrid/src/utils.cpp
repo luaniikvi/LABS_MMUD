@@ -6,8 +6,11 @@
 #include <iomanip>
 #include <algorithm>
 #include <vector>
+#include <cstdio>
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include "rsa_engine.hpp"
+#include "hybrid_engine.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -86,7 +89,6 @@ std::string to_base64(const std::vector<uint8_t>& data) {
 std::vector<uint8_t> from_base64(const std::string& base64) {
     std::vector<uint8_t> ret;
     int i = 0;
-    int in_ = 0;
     unsigned char char_array_4[4], char_array_3[3];
 
     for (char c : base64) {
@@ -233,6 +235,11 @@ void fail_closed(const std::string& message) {
     throw std::runtime_error(message);
 }
 
+bool file_exists(const std::string& path) {
+    std::ifstream f(path);
+    return f.good();
+}
+
 } // namespace utils
 } // namespace lab3
 
@@ -291,11 +298,36 @@ void RunKatTests(const std::string& katFilePath) {
         }
         
         try {
-            // Encrypt
-            auto ciphertext = rsa_engine::encrypt(pub_key, plaintext, label);
+            // Determine if we need hybrid mode (plaintext > max RSA-OAEP size)
+            size_t max_rsa_size = rsa_engine::get_max_plaintext_size(pub_key.GetModulus().BitCount());
+            bool use_hybrid = (plaintext.size() > max_rsa_size) || !test.value("aad", "").empty()
+                              || algorithm.find("Hybrid") != std::string::npos
+                              || algorithm.find("AES-GCM") != std::string::npos;
             
-            // Decrypt
-            auto decrypted = rsa_engine::decrypt(priv_key, ciphertext, label);
+            std::vector<uint8_t> decrypted;
+            
+            if (use_hybrid) {
+                // Use hybrid engine for large payloads or when AAD is present
+                std::vector<uint8_t> aad;
+                if (test.contains("aad")) {
+                    aad = utils::string_to_bytes(test["aad"]);
+                }
+                
+                std::string env_file = "kat_env_tmp_" + std::to_string(id) + ".bin";
+                std::string out_file = "kat_out_tmp_" + std::to_string(id) + ".bin";
+                
+                hybrid_engine::encrypt_hybrid(pub_key, plaintext, env_file, label, aad);
+                hybrid_engine::decrypt_hybrid(priv_key, env_file, out_file, label);
+                
+                decrypted = utils::read_file(out_file);
+                
+                std::remove(env_file.c_str());
+                std::remove(out_file.c_str());
+            } else {
+                // Direct RSA-OAEP for small payloads
+                auto ciphertext = rsa_engine::encrypt(pub_key, plaintext, label);
+                decrypted = rsa_engine::decrypt(priv_key, ciphertext, label);
+            }
             
             // Verify
             if (decrypted == plaintext) {

@@ -1,0 +1,8 @@
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/Catch2WithMain_local.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_lib.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_tests.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/aestool_bench.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/test.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/edit_cache.dir
+/e/MatMaUngDung/Labs/Lab1_Symmetric/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\rsa_engine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\hybrid_engine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\rsa_engine.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\hybrid_engine.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\src\utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\MatMaUngDung\Labs\Lab3_RSA_Hybrid\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{7A028F65-6009-3457-A05B-CB0F3F80014D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{32EEAD35-0E31-3834-8CA7-E8A52A4D5C0D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

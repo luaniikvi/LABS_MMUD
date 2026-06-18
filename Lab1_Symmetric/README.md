@@ -78,7 +78,7 @@ Executables: `build\Release\aestool.exe`, `build\Release\aestool_tests.exe`, `bu
 ```cmd
 mkdir build
 cd build
-cmake .. -G "MinGW Makefiles"
+cmake ..
 cmake --build .
 ```
 
@@ -270,6 +270,9 @@ cmake --build . --target aestool_tests
 # Run all tests via CTest
 ctest --output-on-failure
 
+# Run with verbose output (shows each test's stdout/stderr)
+ctest -V
+
 # Or run directly for per-test PASS/FAIL output
 ./aestool_tests
 ```
@@ -338,7 +341,7 @@ Per-mode IV length enforcement:
 
 | Mode                  | IV length   |
 |-----------------------|-------------|
-| CBC, CTR, OFB, CFB   | 16 bytes    |
+| CBC, CTR, OFB, CFB    | 16 bytes    |
 | XTS                   | 16 bytes    |
 | GCM                   | 12 bytes    |
 | CCM                   | 7–13 bytes  |
@@ -368,6 +371,41 @@ Before each encryption with CTR, GCM, or CCM, the engine checks whether the `(ke
 3. Also load entries from `.aestool_nonce_registry.json` in the working directory (written by prior encrypt operations).
 4. If a match is found → reject with `CRITICAL SECURITY VIOLATION: Detected reuse of (Key, Nonce) pair!`
 5. After a successful encrypt, register the pair in memory and append to `.aestool_nonce_registry.json`.
+
+#### `.aestool_nonce_registry.json` File Format
+
+This file is a persistent nonce reuse protection registry stored in the working directory. It tracks every `(key, nonce)` pair that has been used for encryption in AEAD modes (GCM, CCM) and CTR mode.
+
+**Purpose:** In AES-GCM/CCM/CTR, reusing the same `(key, nonce/IV)` pair is catastrophic — it completely breaks confidentiality and authentication. This file prevents nonce reuse attacks across multiple `aestool` invocations by persisting the registry to disk.
+
+**File format:**
+
+```json
+{
+  "entries": [
+    {
+      "key": "69FD0C4F9C74ECBD...",   // AES key (hex)
+      "mode": "gcm",                    // Cipher mode used
+      "nonce": "07913CACBF872E..."     // IV/nonce used (hex)
+    }
+  ]
+}
+```
+
+**Fields:**
+
+| Field     | Description                                      |
+|-----------|--------------------------------------------------|
+| `key`     | The AES encryption key in hex format              |
+| `mode`    | The cipher mode (`gcm`, `ccm`, `ctr`)            |
+| `nonce`   | The IV/nonce value in hex format                  |
+
+**Lifecycle:**
+
+- **Created** automatically on first encryption with CTR/GCM/CCM mode.
+- **Updated** after each successful encryption — the `(key, nonce, mode)` tuple is appended.
+- **Loaded** at startup and checked before each encryption to detect reuse.
+- **Can be safely deleted** if you are certain all future operations will use fresh nonces.
 
 ### Key File Formats
 

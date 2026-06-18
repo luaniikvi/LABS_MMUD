@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <fstream>
 
 using namespace lab3;
 
@@ -32,7 +33,7 @@ DLL_EXPORT int lab3_keygen(
         return 0; // Success
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return -1; // Error
     }
@@ -49,10 +50,18 @@ DLL_EXPORT const char* lab3_encrypt(
     try {
         g_error_msg[0] = '\0';
         
+        // Validate key file exists
+        if (!utils::file_exists(pub_key_file)) {
+            std::string msg = "Public key file not found: " + std::string(pub_key_file);
+            strncpy_s(error_msg, 1024, msg.c_str(), 1023);
+            error_msg[1023] = '\0';
+            return nullptr;
+        }
+        
         // Load public key
         auto pub_key = rsa_engine::load_public_key(pub_key_file);
         
-        // Convert plaintext
+        // Convert plaintext to bytes
         std::vector<uint8_t> pt(plaintext, plaintext + strlen(plaintext));
         
         // Parse AAD
@@ -83,7 +92,7 @@ DLL_EXPORT const char* lab3_encrypt(
         }
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -98,6 +107,14 @@ DLL_EXPORT int lab3_decrypt(
 ) {
     try {
         g_error_msg[0] = '\0';
+        
+        // Validate key file exists
+        if (!utils::file_exists(priv_key_file)) {
+            std::string msg = "Private key file not found: " + std::string(priv_key_file);
+            strncpy_s(error_msg, 1024, msg.c_str(), 1023);
+            error_msg[1023] = '\0';
+            return -1;
+        }
         
         // Load private key
         auto priv_key = rsa_engine::load_private_key(priv_key_file);
@@ -117,13 +134,13 @@ DLL_EXPORT int lab3_decrypt(
         return 0; // Success
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return -1; // Error
     }
 }
 
-DLL_EXPORT void lab3_free_string(const char* str) {
+DLL_EXPORT void lab3_free_string(const char* /*str*/) {
     // No-op for static buffer
 }
 
@@ -133,29 +150,21 @@ static thread_local std::string g_test_output;
 static thread_local std::string g_kat_output;
 
 DLL_EXPORT const char* lab3_run_benchmark(
-    const char* mode_filter,
+    const char* /*mode_filter*/,
     char* error_msg
 ) {
     try {
         g_bench_output.clear();
         
         std::ostringstream oss;
-        std::streambuf* old_cout = std::cout.rdbuf(oss.rdbuf());
-        std::streambuf* old_cerr = std::cerr.rdbuf(oss.rdbuf());
-        
-        using namespace std;
-        
-        oss << "=== RSA-OAEP & Hybrid Benchmark ===" << endl;
-        oss << "Note: Full benchmark requires CLI tool: rsatool_bench.exe" << endl;
-        
-        std::cout.rdbuf(old_cout);
-        std::cerr.rdbuf(old_cerr);
+        oss << "=== RSA-OAEP & Hybrid Benchmark ===" << std::endl;
+        oss << "Note: Full benchmark requires CLI tool: benchmark_lab3" << std::endl;
         
         g_bench_output = oss.str();
         return g_bench_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -174,37 +183,31 @@ DLL_EXPORT const char* lab3_run_tests(
         *failed = 0;
         
         std::ostringstream oss;
-        std::streambuf* old_cout = std::cout.rdbuf(oss.rdbuf());
-        std::streambuf* old_cerr = std::cerr.rdbuf(oss.rdbuf());
+        oss << "=== RSA Basic Validation Tests ===" << std::endl;
         
-        using namespace std;
-        using namespace lab3;
-        
-        oss << "=== RSA Basic Validation Tests ===" << endl;
-        
-        // Test 1: RSA key generation
+        // Test 1: RSA key generation (3072 minimum per requirements)
         try {
             std::string pub_file = "dll_test_pub.pem";
             std::string priv_file = "dll_test_priv.pem";
             std::string meta_file = "dll_test_meta.json";
             
-            rsa_engine::generate_keypair(2048, pub_file, priv_file, meta_file);
+            rsa_engine::generate_keypair(3072, pub_file, priv_file, meta_file);
             
             auto pub_key = rsa_engine::load_public_key_pem(pub_file);
-            if (pub_key) {
-                oss << "[PASS] RSA-2048 key generation" << endl;
+            if (pub_key.GetModulus().BitCount() == 3072) {
+                oss << "[PASS] RSA-3072 key generation" << std::endl;
                 (*passed)++;
             } else {
-                oss << "[FAIL] RSA-2048 key generation" << endl;
+                oss << "[FAIL] RSA-3072 key generation - wrong bit count" << std::endl;
                 (*failed)++;
             }
             
             // Cleanup
-            remove(pub_file.c_str());
-            remove(priv_file.c_str());
-            remove(meta_file.c_str());
+            std::remove(pub_file.c_str());
+            std::remove(priv_file.c_str());
+            std::remove(meta_file.c_str());
         } catch (...) {
-            oss << "[FAIL] RSA-2048 key generation - exception" << endl;
+            oss << "[FAIL] RSA-3072 key generation - exception" << std::endl;
             (*failed)++;
         }
         
@@ -214,43 +217,42 @@ DLL_EXPORT const char* lab3_run_tests(
             std::string priv_file = "dll_test_priv.pem";
             std::string meta_file = "dll_test_meta.json";
             
-            rsa_engine::generate_keypair(2048, pub_file, priv_file, meta_file);
+            rsa_engine::generate_keypair(3072, pub_file, priv_file, meta_file);
             
             auto pub_key = rsa_engine::load_public_key_pem(pub_file);
             auto priv_key = rsa_engine::load_private_key_pem(priv_file);
             
             std::string plaintext = "Hello RSA-OAEP!";
-            auto ciphertext = rsa_engine::encrypt(pub_key, plaintext);
+            auto pt_bytes = std::vector<uint8_t>(plaintext.begin(), plaintext.end());
+            auto ciphertext = rsa_engine::encrypt(pub_key, pt_bytes);
             auto decrypted = rsa_engine::decrypt(priv_key, ciphertext);
             
-            if (decrypted == plaintext) {
-                oss << "[PASS] RSA-OAEP encrypt/decrypt" << endl;
+            std::string dec_str(decrypted.begin(), decrypted.end());
+            if (dec_str == plaintext) {
+                oss << "[PASS] RSA-OAEP encrypt/decrypt" << std::endl;
                 (*passed)++;
             } else {
-                oss << "[FAIL] RSA-OAEP encrypt/decrypt" << endl;
+                oss << "[FAIL] RSA-OAEP encrypt/decrypt - mismatch" << std::endl;
                 (*failed)++;
             }
             
             // Cleanup
-            remove(pub_file.c_str());
-            remove(priv_file.c_str());
-            remove(meta_file.c_str());
+            std::remove(pub_file.c_str());
+            std::remove(priv_file.c_str());
+            std::remove(meta_file.c_str());
         } catch (...) {
-            oss << "[FAIL] RSA-OAEP encrypt/decrypt - exception" << endl;
+            oss << "[FAIL] RSA-OAEP encrypt/decrypt - exception" << std::endl;
             (*failed)++;
         }
         
         *total = *passed + *failed;
-        oss << endl << "Results: " << *passed << "/" << *total << " passed" << endl;
-        
-        std::cout.rdbuf(old_cout);
-        std::cerr.rdbuf(old_cerr);
+        oss << std::endl << "Results: " << *passed << "/" << *total << " passed" << std::endl;
         
         g_test_output = oss.str();
         return g_test_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }
@@ -264,28 +266,22 @@ DLL_EXPORT const char* lab3_run_kat(
         g_kat_output.clear();
         
         std::ostringstream oss;
-        std::streambuf* old_cout = std::cout.rdbuf(oss.rdbuf());
-        std::streambuf* old_cerr = std::cerr.rdbuf(oss.rdbuf());
+        oss << "=== RSA KAT Validation ===" << std::endl;
+        oss << "Vectors file: " << vectors_file << std::endl;
         
-        using namespace std;
-        
-        oss << "=== RSA KAT Validation ===" << endl;
-        oss << "Vectors file: " << vectors_file << endl;
-        
-        if (!utils::file_exists(vectors_file)) {
-            oss << "[ERROR] File not found: " << vectors_file << endl;
+        // Check file exists
+        std::ifstream check(vectors_file);
+        if (!check.good()) {
+            oss << "[ERROR] File not found: " << vectors_file << std::endl;
         } else {
-            oss << "[INFO] Full KAT validation requires CLI: rsatool.exe --kat " << vectors_file << endl;
+            oss << "[INFO] Full KAT validation requires CLI: rsatool --kat " << vectors_file << std::endl;
         }
-        
-        std::cout.rdbuf(old_cout);
-        std::cerr.rdbuf(old_cerr);
         
         g_kat_output = oss.str();
         return g_kat_output.c_str();
         
     } catch (const std::exception& e) {
-        strncpy(error_msg, e.what(), 1023);
+        strncpy_s(error_msg, 1024, e.what(), 1023);
         error_msg[1023] = '\0';
         return nullptr;
     }

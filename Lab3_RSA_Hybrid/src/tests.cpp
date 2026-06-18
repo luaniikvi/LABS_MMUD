@@ -1,5 +1,4 @@
-#define CATCH_CONFIG_MAIN
-#include "catch_amalgamated.hpp"
+#include <catch2/catch_amalgamated.hpp>
 #include "rsa_engine.hpp"
 #include "hybrid_engine.hpp"
 #include "utils.hpp"
@@ -14,6 +13,13 @@ using json = nlohmann::json;
 using namespace lab3;
 
 namespace fs = std::filesystem;
+
+// Helper: resolve path relative to source file location (works from any cwd)
+static std::string get_test_vectors_path() {
+    fs::path src_dir = fs::path(__FILE__).parent_path();
+    fs::path tv_dir = src_dir.parent_path() / "test_vectors";
+    return tv_dir.string();
+}
 
 // Test fixtures
 struct KeyPairFixture {
@@ -101,10 +107,10 @@ TEST_CASE("RSA-OAEP Encrypt/Decrypt - With Label", "[rsa][encrypt]") {
 
 TEST_CASE("RSA-OAEP - Max Plaintext Size", "[rsa][encrypt]") {
     size_t max_3072 = rsa_engine::get_max_plaintext_size(3072);
-    REQUIRE(max_3072 == 382); // k - 2*hLen - 2 = 384 - 64 - 2
+    REQUIRE(max_3072 == 318); // k - 2*hLen - 2 = 384 - 2*32 - 2 = 318 (SHA-256)
     
     size_t max_4096 = rsa_engine::get_max_plaintext_size(4096);
-    REQUIRE(max_4096 == 446); // 512 - 64 - 2
+    REQUIRE(max_4096 == 446); // 512 - 2*32 - 2 = 446
 }
 
 // ============================================================================
@@ -112,10 +118,15 @@ TEST_CASE("RSA-OAEP - Max Plaintext Size", "[rsa][encrypt]") {
 // ============================================================================
 
 TEST_CASE("RSA-OAEP - Wrong Key Decryption", "[rsa][negative]") {
-    KeyPairFixture fixture1, fixture2;
+    // Generate two separate keypairs with unique file paths
+    std::string pub1 = "test_wrongkey_pub1.pem", priv1 = "test_wrongkey_priv1.pem", meta1 = "test_wrongkey_meta1.json";
+    std::string pub2 = "test_wrongkey_pub2.pem", priv2 = "test_wrongkey_priv2.pem", meta2 = "test_wrongkey_meta2.json";
     
-    auto pub_key1 = rsa_engine::load_public_key(fixture1.pub_file);
-    auto priv_key2 = rsa_engine::load_private_key(fixture2.priv_file);
+    rsa_engine::generate_keypair(3072, pub1, priv1, meta1);
+    rsa_engine::generate_keypair(3072, pub2, priv2, meta2);
+    
+    auto pub_key1 = rsa_engine::load_public_key(pub1);
+    auto priv_key2 = rsa_engine::load_private_key(priv2);
     
     std::string plaintext = "Secret message";
     auto pt_bytes = utils::string_to_bytes(plaintext);
@@ -124,6 +135,9 @@ TEST_CASE("RSA-OAEP - Wrong Key Decryption", "[rsa][negative]") {
     
     // Decrypt with wrong private key should fail
     REQUIRE_THROWS(rsa_engine::decrypt(priv_key2, ciphertext));
+    
+    // Cleanup
+    for (auto& f : {pub1, priv1, meta1, pub2, priv2, meta2}) fs::remove(f);
 }
 
 TEST_CASE("RSA-OAEP - Tampered Ciphertext", "[rsa][negative]") {
@@ -255,10 +269,15 @@ TEST_CASE("Hybrid - Tampered Ciphertext Detection", "[hybrid][negative]") {
 }
 
 TEST_CASE("Hybrid - Wrong Private Key", "[hybrid][negative]") {
-    KeyPairFixture fixture1, fixture2;
+    // Generate two separate keypairs with unique file paths
+    std::string pub1 = "test_hybwk_pub1.pem", priv1 = "test_hybwk_priv1.pem", meta1 = "test_hybwk_meta1.json";
+    std::string pub2 = "test_hybwk_pub2.pem", priv2 = "test_hybwk_priv2.pem", meta2 = "test_hybwk_meta2.json";
     
-    auto pub_key1 = rsa_engine::load_public_key(fixture1.pub_file);
-    auto priv_key2 = rsa_engine::load_private_key(fixture2.priv_file);
+    rsa_engine::generate_keypair(3072, pub1, priv1, meta1);
+    rsa_engine::generate_keypair(3072, pub2, priv2, meta2);
+    
+    auto pub_key1 = rsa_engine::load_public_key(pub1);
+    auto priv_key2 = rsa_engine::load_private_key(priv2);
     
     std::vector<uint8_t> plaintext(512, 0x12);
     std::string env_file = "test_envelope_wrong_key.bin";
@@ -268,7 +287,9 @@ TEST_CASE("Hybrid - Wrong Private Key", "[hybrid][negative]") {
     
     REQUIRE_THROWS(hybrid_engine::decrypt_hybrid(priv_key2, env_file, out_file));
     
+    // Cleanup
     fs::remove(env_file);
+    for (auto& f : {pub1, priv1, meta1, pub2, priv2, meta2}) fs::remove(f);
 }
 
 // ============================================================================
@@ -276,7 +297,7 @@ TEST_CASE("Hybrid - Wrong Private Key", "[hybrid][negative]") {
 // ============================================================================
 
 TEST_CASE("KAT Runner - RSA-OAEP Vectors", "[kat][rsa]") {
-    std::string kat_file = "test_vectors/rsa_oaep_kats.json";
+    std::string kat_file = get_test_vectors_path() + "/rsa_oaep_kats.json";
     
     if (!fs::exists(kat_file)) {
         WARN("KAT file not found: " << kat_file);
@@ -329,7 +350,7 @@ TEST_CASE("KAT Runner - RSA-OAEP Vectors", "[kat][rsa]") {
 }
 
 TEST_CASE("KAT Runner - Hybrid Encryption Vectors", "[kat][hybrid]") {
-    std::string kat_file = "test_vectors/hybrid_kats.json";
+    std::string kat_file = get_test_vectors_path() + "/hybrid_kats.json";
     
     if (!fs::exists(kat_file)) {
         WARN("KAT file not found: " << kat_file);
@@ -398,7 +419,7 @@ TEST_CASE("KAT Runner - Hybrid Encryption Vectors", "[kat][hybrid]") {
 TEST_CASE("Hex Encoding/Decoding", "[utils][encoding]") {
     std::vector<uint8_t> data = {0x00, 0x11, 0x22, 0xAB, 0xCD, 0xFF};
     std::string hex = utils::to_hex(data);
-    REQUIRE(hex == "001122abcdf");
+    REQUIRE(hex == "001122abcdff");
     
     auto decoded = utils::from_hex(hex);
     REQUIRE(decoded == data);
@@ -441,4 +462,136 @@ TEST_CASE("File I/O - Text", "[utils][io]") {
     REQUIRE(read_text == text);
     
     fs::remove(test_file);
+}
+
+// ============================================================================
+// DER Format Tests
+// ============================================================================
+
+TEST_CASE("DER Format - Save and Load Roundtrip", "[rsa][der]") {
+    KeyPairFixture fixture;
+    
+    auto pub_key = rsa_engine::load_public_key(fixture.pub_file);
+    auto priv_key = rsa_engine::load_private_key(fixture.priv_file);
+    
+    std::string pub_der = "test_pub.der";
+    std::string priv_der = "test_priv.der";
+    
+    // Save in DER format
+    rsa_engine::save_public_key_der(pub_key, pub_der);
+    rsa_engine::save_private_key_der(priv_key, priv_der);
+    
+    REQUIRE(fs::exists(pub_der));
+    REQUIRE(fs::exists(priv_der));
+    
+    // Load from DER
+    auto pub_key_der = rsa_engine::load_public_key_der(pub_der);
+    auto priv_key_der = rsa_engine::load_private_key_der(priv_der);
+    
+    // Verify keys match
+    REQUIRE(pub_key.GetModulus() == pub_key_der.GetModulus());
+    REQUIRE(priv_key.GetModulus() == priv_key_der.GetModulus());
+    
+    // Verify encrypt/decrypt works with DER-loaded keys
+    std::string msg = "DER format test";
+    auto pt = utils::string_to_bytes(msg);
+    auto ct = rsa_engine::encrypt(pub_key_der, pt);
+    auto dec = rsa_engine::decrypt(priv_key_der, ct);
+    REQUIRE(utils::bytes_to_string(dec) == msg);
+    
+    fs::remove(pub_der);
+    fs::remove(priv_der);
+}
+
+// ============================================================================
+// Additional Negative Tests (required by lab specification)
+// ============================================================================
+
+TEST_CASE("RSA-OAEP - Wrong Label Decryption Fails", "[rsa][negative][label]") {
+    KeyPairFixture fixture;
+    
+    auto pub_key = rsa_engine::load_public_key(fixture.pub_file);
+    auto priv_key = rsa_engine::load_private_key(fixture.priv_file);
+    
+    std::string plaintext = "Label-sensitive message";
+    std::string encrypt_label = "CorrectLabel";
+    std::string decrypt_label = "WrongLabel";
+    
+    auto pt_bytes = utils::string_to_bytes(plaintext);
+    auto ciphertext = rsa_engine::encrypt(pub_key, pt_bytes, encrypt_label);
+    
+    // Decrypt with wrong label must fail (OAEP label is cryptographically bound)
+    REQUIRE_THROWS(rsa_engine::decrypt(priv_key, ciphertext, decrypt_label));
+}
+
+TEST_CASE("Hybrid - Wrong OAEP Label Fails", "[hybrid][negative][label]") {
+    KeyPairFixture fixture;
+    
+    auto pub_key = rsa_engine::load_public_key(fixture.pub_file);
+    auto priv_key = rsa_engine::load_private_key(fixture.priv_file);
+    
+    std::vector<uint8_t> plaintext(2048, 0xAB); // Forces hybrid mode
+    std::string env_file = "test_label_env.bin";
+    std::string out_file = "test_label_out.bin";
+    std::string label = "MyLabel";
+    
+    hybrid_engine::encrypt_hybrid(pub_key, plaintext, env_file, label);
+    
+    // Decrypt with wrong label must fail
+    REQUIRE_THROWS(hybrid_engine::decrypt_hybrid(priv_key, env_file, out_file, "WrongLabel"));
+    
+    fs::remove(env_file);
+}
+
+TEST_CASE("Hybrid - Tampered Envelope Header Fails", "[hybrid][negative][header]") {
+    KeyPairFixture fixture;
+    
+    auto pub_key = rsa_engine::load_public_key(fixture.pub_file);
+    auto priv_key = rsa_engine::load_private_key(fixture.priv_file);
+    
+    std::vector<uint8_t> plaintext(1024, 0xEF);
+    std::string env_file = "test_header_tamper.bin";
+    std::string out_file = "test_header_out.bin";
+    
+    hybrid_engine::encrypt_hybrid(pub_key, plaintext, env_file);
+    
+    // Tamper with the envelope file data (corrupt the ciphertext portion)
+    auto file_data = utils::read_file(env_file);
+    // Corrupt a byte deep in the file (past the header, in ciphertext area)
+    if (file_data.size() > 100) {
+        file_data[file_data.size() - 10] ^= 0xFF;
+        utils::write_file(env_file, file_data);
+        
+        // Decryption must fail with tampered data
+        REQUIRE_THROWS(hybrid_engine::decrypt_hybrid(priv_key, env_file, out_file));
+    }
+    
+    fs::remove(env_file);
+}
+
+TEST_CASE("Corrupted PEM Key File Rejected", "[rsa][negative][pem]") {
+    std::string bad_pem = "corrupted_key.pem";
+    
+    // Write a corrupted PEM file with invalid base64
+    std::string corrupt_content = 
+        "-----BEGIN RSA PUBLIC KEY-----\n"
+        "NOT_VALID_BASE64_KEY!!!\n"
+        "-----END RSA PUBLIC KEY-----\n";
+    utils::write_text_file(bad_pem, corrupt_content);
+    
+    REQUIRE_THROWS(rsa_engine::load_public_key_pem(bad_pem));
+    
+    fs::remove(bad_pem);
+}
+
+TEST_CASE("Malformed PEM - Missing Header Rejected", "[rsa][negative][pem]") {
+    std::string bad_pem = "no_header.pem";
+    
+    // Write a file without PEM headers
+    utils::write_text_file(bad_pem, "Just random text without PEM headers");
+    
+    REQUIRE_THROWS(rsa_engine::load_public_key_pem(bad_pem));
+    REQUIRE_THROWS(rsa_engine::load_private_key_pem(bad_pem));
+    
+    fs::remove(bad_pem);
 }

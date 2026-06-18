@@ -95,11 +95,8 @@ BenchmarkResult benchmark_rsa_encrypt(int bits, const std::vector<uint8_t>& plai
     std::cout << "\n[BM] RSA-" << bits << " Encryption (" << num_runs << " runs)..." << std::endl;
     warmup();
     
-    // Generate key pair once
+    // Use existing keypair files (must already exist)
     std::string pub_file = "bm_pub.pem";
-    std::string priv_file = "bm_priv.pem";
-    std::string meta_file = "bm_meta.json";
-    rsa_engine::generate_keypair(bits, pub_file, priv_file, meta_file);
     auto pub_key = rsa_engine::load_public_key(pub_file);
     
     std::vector<double> times;
@@ -119,10 +116,6 @@ BenchmarkResult benchmark_rsa_encrypt(int bits, const std::vector<uint8_t>& plai
     }
     std::cout << std::endl;
     
-    fs::remove(pub_file);
-    fs::remove(priv_file);
-    fs::remove(meta_file);
-    
     BenchmarkResult result;
     result.num_runs = num_runs;
     result.mean_ms = calculate_mean(times);
@@ -138,10 +131,8 @@ BenchmarkResult benchmark_rsa_decrypt(int bits, const std::vector<uint8_t>& ciph
     std::cout << "\n[BM] RSA-" << bits << " Decryption (" << num_runs << " runs)..." << std::endl;
     warmup();
     
-    std::string pub_file = "bm_pub.pem";
+    // Use existing keypair files (must already exist)
     std::string priv_file = "bm_priv.pem";
-    std::string meta_file = "bm_meta.json";
-    rsa_engine::generate_keypair(bits, pub_file, priv_file, meta_file);
     auto priv_key = rsa_engine::load_private_key(priv_file);
     
     std::vector<double> times;
@@ -161,10 +152,6 @@ BenchmarkResult benchmark_rsa_decrypt(int bits, const std::vector<uint8_t>& ciph
     }
     std::cout << std::endl;
     
-    fs::remove(pub_file);
-    fs::remove(priv_file);
-    fs::remove(meta_file);
-    
     BenchmarkResult result;
     result.num_runs = num_runs;
     result.mean_ms = calculate_mean(times);
@@ -177,13 +164,12 @@ BenchmarkResult benchmark_rsa_decrypt(int bits, const std::vector<uint8_t>& ciph
 }
 
 BenchmarkResult benchmark_hybrid_encrypt(int bits, size_t payload_size, int num_runs) {
+    (void)bits;  // key size is determined by the pre-generated keypair file
     std::cout << "\n[BM] Hybrid Encrypt - " << payload_size << " bytes (" << num_runs << " runs)..." << std::endl;
     warmup();
     
+    // Use existing keypair files (must already exist)
     std::string pub_file = "bm_pub.pem";
-    std::string priv_file = "bm_priv.pem";
-    std::string meta_file = "bm_meta.json";
-    rsa_engine::generate_keypair(bits, pub_file, priv_file, meta_file);
     auto pub_key = rsa_engine::load_public_key(pub_file);
     
     std::vector<uint8_t> plaintext(payload_size, 0xAB);
@@ -209,9 +195,6 @@ BenchmarkResult benchmark_hybrid_encrypt(int bits, size_t payload_size, int num_
     // Calculate throughput
     double mean_sec = calculate_mean(times) / 1000.0;
     
-    fs::remove(pub_file);
-    fs::remove(priv_file);
-    fs::remove(meta_file);
     fs::remove(env_file);
     
     BenchmarkResult result;
@@ -226,13 +209,13 @@ BenchmarkResult benchmark_hybrid_encrypt(int bits, size_t payload_size, int num_
 }
 
 BenchmarkResult benchmark_hybrid_decrypt(int bits, size_t payload_size, int num_runs) {
+    (void)bits;  // key size is determined by the pre-generated keypair file
     std::cout << "\n[BM] Hybrid Decrypt - " << payload_size << " bytes (" << num_runs << " runs)..." << std::endl;
     warmup();
     
+    // Use existing keypair files (must already exist)
     std::string pub_file = "bm_pub.pem";
     std::string priv_file = "bm_priv.pem";
-    std::string meta_file = "bm_meta.json";
-    rsa_engine::generate_keypair(bits, pub_file, priv_file, meta_file);
     auto pub_key = rsa_engine::load_public_key(pub_file);
     auto priv_key = rsa_engine::load_private_key(priv_file);
     
@@ -263,9 +246,6 @@ BenchmarkResult benchmark_hybrid_decrypt(int bits, size_t payload_size, int num_
     // Calculate throughput
     double mean_sec = calculate_mean(times) / 1000.0;
     
-    fs::remove(pub_file);
-    fs::remove(priv_file);
-    fs::remove(meta_file);
     fs::remove(env_file);
     fs::remove(out_file);
     
@@ -287,7 +267,7 @@ void print_result(const std::string& label, const BenchmarkResult& result) {
     std::cout << "Mean:        " << result.mean_ms << " ms" << std::endl;
     std::cout << "Median:      " << result.median_ms << " ms" << std::endl;
     std::cout << "Std Dev:     " << result.std_dev_ms << " ms" << std::endl;
-    std::cout << "95% CI:      ±" << result.ci95_ms << " ms" << std::endl;
+    std::cout << "95% CI:      ~" << result.ci95_ms << " ms" << std::endl;
     if (result.throughput_mbps > 0) {
         std::cout << "Throughput:  " << result.throughput_mbps << " MB/s" << std::endl;
     }

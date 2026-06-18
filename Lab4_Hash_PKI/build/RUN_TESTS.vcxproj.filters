@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="E:\MatMaUngDung\Labs\Lab4_Hash_PKI\build\CMakeFiles\062932a0ca382907b288cb404a2c434a\RUN_TESTS_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{4DDA5BE0-1445-315A-9F9C-C433779B294A}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

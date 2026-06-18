@@ -4,7 +4,7 @@ This guide explains how to build Lab 3 with different compilers.
 
 ## Supported Compilers
 
-- ✅ **MSVC** (Visual Studio 2019/2022) - Windows
+- ✅ **MSVC** - Windows
 - ✅ **MinGW** (MSYS2) - Windows
 - ✅ **GCC** - Linux
 
@@ -27,7 +27,7 @@ This guide explains how to build Lab 3 with different compilers.
 ```cmd
 cd Lab3_RSA_Hybrid
 mkdir build_msvc && cd build_msvc
-cmake .. -G "Visual Studio 17 2022" -A x64
+cmake ..
 cmake --build . --config Release
 ctest -C Release -V
 ```

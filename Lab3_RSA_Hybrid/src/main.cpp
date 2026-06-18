@@ -34,11 +34,14 @@ void PrintHelp() {
     std::cout << "  --out <file>        Path to the output file (Binary-safe).\n";
     std::cout << "  --pub <file>        Public key file (PEM format).\n";
     std::cout << "  --priv <file>       Private key file (PEM format).\n";
+    std::cout << "  --pub-der <file>    Public key output in DER format (auto-generated if omitted).\n";
+    std::cout << "  --priv-der <file>   Private key output in DER format (auto-generated if omitted).\n";
     std::cout << "  --label <str>       Optional OAEP label for encryption/decryption.\n";
     std::cout << "  --aad <file>        Additional Authenticated Data from binary file.\n";
     std::cout << "  --aad-text <str>    Additional Authenticated Data as UTF-8 string.\n";
     std::cout << "  --encode <type>     Output encoding: hex (default), base64, raw.\n";
     std::cout << "  --kat <file.json>   Path to NIST Known Answer Tests vector file.\n";
+    std::cout << "  --threads <N>       Number of threads for benchmarking (default: auto).\n";
     std::cout << "  --verbose           Enable detailed cryptographic processing logs.\n\n";
     std::cout << "EXAMPLES:\n";
     std::cout << "  rsatool keygen --bits 3072 --pub pub.pem --priv priv.pem\n";
@@ -55,6 +58,8 @@ struct CLIArgs {
     int bits = 3072;
     std::string pub_file;
     std::string priv_file;
+    std::string pub_der;
+    std::string priv_der;
     std::string in_file;
     std::string out_file;
     std::string text;
@@ -63,6 +68,7 @@ struct CLIArgs {
     std::string aad_text;
     std::string encode = "hex";
     std::string kat_file;
+    int threads = 0; // 0 = auto-detect
     bool verbose = false;
 };
 
@@ -72,6 +78,22 @@ CLIArgs parse_args(int argc, char* argv[]) {
     if (argc < 2) {
         PrintHelp();
         utils::fail_closed("No command specified. Use --help for usage information.");
+    }
+    
+    // Check if first argument is a global flag (not a command)
+    std::string first_arg = argv[1];
+    if (first_arg == "--help" || first_arg == "-h") {
+        PrintHelp();
+        exit(0);
+    }
+    // Handle --kat as first argument: rsatool --kat path/to/vectors.json
+    if (first_arg == "--kat") {
+        if (argc < 3) {
+            utils::fail_closed("--kat requires a JSON vector file path");
+        }
+        args.command = "kat";
+        args.kat_file = argv[2];
+        return args;
     }
     
     args.command = argv[1];
@@ -88,6 +110,10 @@ CLIArgs parse_args(int argc, char* argv[]) {
             args.pub_file = argv[++i];
         } else if (arg == "--priv" && i + 1 < argc) {
             args.priv_file = argv[++i];
+        } else if (arg == "--pub-der" && i + 1 < argc) {
+            args.pub_der = argv[++i];
+        } else if (arg == "--priv-der" && i + 1 < argc) {
+            args.priv_der = argv[++i];
         } else if (arg == "--in" && i + 1 < argc) {
             args.in_file = argv[++i];
         } else if (arg == "--out" && i + 1 < argc) {
@@ -104,6 +130,8 @@ CLIArgs parse_args(int argc, char* argv[]) {
             args.encode = argv[++i];
         } else if (arg == "--kat" && i + 1 < argc) {
             args.kat_file = argv[++i];
+        } else if (arg == "--threads" && i + 1 < argc) {
+            args.threads = std::stoi(argv[++i]);
         } else if (arg == "--verbose") {
             args.verbose = true;
         } else {
@@ -128,6 +156,31 @@ void cmd_keygen(const CLIArgs& args) {
     }
     
     rsa_engine::generate_keypair(args.bits, args.pub_file, args.priv_file, metadata_file);
+    
+    // Also save DER format (requirement: must save PEM and DER)
+    auto pub_key = rsa_engine::load_public_key_pem(args.pub_file);
+    auto priv_key = rsa_engine::load_private_key_pem(args.priv_file);
+    
+    std::string pub_der = args.pub_der;
+    if (pub_der.empty()) {
+        // Auto-generate DER filename from PEM filename
+        pub_der = args.pub_file;
+        size_t d = pub_der.find_last_of('.');
+        pub_der = (d != std::string::npos ? pub_der.substr(0, d) : pub_der) + ".der";
+    }
+    
+    std::string priv_der = args.priv_der;
+    if (priv_der.empty()) {
+        priv_der = args.priv_file;
+        size_t d = priv_der.find_last_of('.');
+        priv_der = (d != std::string::npos ? priv_der.substr(0, d) : priv_der) + ".der";
+    }
+    
+    rsa_engine::save_public_key_der(pub_key, pub_der);
+    rsa_engine::save_private_key_der(priv_key, priv_der);
+    
+    std::cout << "[INFO] DER public key: " << pub_der << std::endl;
+    std::cout << "[INFO] DER private key: " << priv_der << std::endl;
 }
 
 void cmd_encrypt(const CLIArgs& args) {
@@ -241,7 +294,7 @@ void cmd_decrypt(const CLIArgs& args) {
             std::cout << "[VERBOSE] Attempting hybrid decryption..." << std::endl;
         }
         hybrid_engine::decrypt_hybrid(priv_key, args.in_file, args.out_file, args.label);
-    } catch (const std::exception& e) {
+    } catch (const std::exception& /*e*/) {
         // Fallback to direct RSA-OAEP decryption
         if (args.verbose) {
             std::cout << "[VERBOSE] Not a hybrid envelope, trying direct RSA-OAEP..." << std::endl;

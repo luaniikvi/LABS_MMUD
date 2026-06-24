@@ -1,5 +1,6 @@
-// dll_export.hpp - DLL export macros for Lab 3
+// dll_export.hpp - DLL export macros for Lab 4
 #pragma once
+#include <cstdint>
 
 #ifdef _WIN32
     #ifdef BUILDING_DLL
@@ -15,55 +16,121 @@
 extern "C" {
 #endif
 
-// Simple C-style API for Python ctypes
-
-// Key Generation
-DLL_EXPORT int lab3_keygen(
-    int bits,
-    const char* pub_file,
-    const char* priv_file,
-    char* error_msg
+// Hashing
+DLL_EXPORT int lab4_hash(
+    const char* algo,
+    const uint8_t* data,
+    int data_len,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
 );
 
-// Encryption/Decryption
-DLL_EXPORT const char* lab3_encrypt(
-    const char* pub_key_file,
-    const char* plaintext,
-    const char* label,
-    const char* aad_hex,
-    const char* output_file,
-    char* error_msg
+DLL_EXPORT int lab4_hash_file(
+    const char* algo,
+    const char* filepath,
+    int stream_mode,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
 );
 
-DLL_EXPORT int lab3_decrypt(
-    const char* priv_key_file,
-    const char* input_file,
-    const char* label,
-    const char* output_file,
-    char* error_msg
+// SHAKE (extendable-output)
+DLL_EXPORT int lab4_shake(
+    const char* algo,
+    const uint8_t* data,
+    int data_len,
+    int outlen,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
 );
 
-// Benchmark
-DLL_EXPORT const char* lab3_run_benchmark(
-    const char* mode_filter,
-    char* error_msg
+DLL_EXPORT int lab4_shake_file(
+    const char* algo,
+    const char* filepath,
+    int stream_mode,
+    int outlen,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
 );
 
-// Unit Tests
-DLL_EXPORT const char* lab3_run_tests(
-    int* total,
-    int* passed,
-    int* failed,
-    char* error_msg
+// HMAC
+DLL_EXPORT int lab4_hmac(
+    const char* algo,
+    const uint8_t* key,
+    int key_len,
+    const uint8_t* data,
+    int data_len,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
 );
 
-// KAT Validation
-DLL_EXPORT const char* lab3_run_kat(
+DLL_EXPORT int lab4_hmac_file(
+    const char* algo,
+    const uint8_t* key,
+    int key_len,
+    const char* filepath,
+    int stream_mode,
+    char* out_hex,
+    int out_hex_len,
+    char* err_buf,
+    int err_buf_len
+);
+
+// X.509
+DLL_EXPORT int lab4_parse_x509(
+    const char* cert_path,
+    char* out_json,
+    int out_json_len,
+    char* err_buf,
+    int err_buf_len
+);
+
+DLL_EXPORT int lab4_verify_x509(
+    const char* cert_path,
+    const char* issuer_pub_path,
+    char* err_buf,
+    int err_buf_len
+);
+
+// Length-extension attack demo
+DLL_EXPORT int lab4_length_ext(
+    const char* mac_hex,
+    int key_len,
+    int msg_len,
+    const char* append_data,
+    char* out_json,
+    int out_json_len,
+    char* err_buf,
+    int err_buf_len
+);
+
+// MD5 collision demo
+DLL_EXPORT int lab4_md5_demo(
+    const char* dir_path,
+    char* out_json,
+    int out_json_len,
+    char* err_buf,
+    int err_buf_len
+);
+
+// KAT runner
+DLL_EXPORT const char* lab4_run_kat(
     const char* vectors_file,
-    char* error_msg
+    char* err_buf,
+    int err_buf_len
 );
 
-DLL_EXPORT void lab3_free_string(const char* str);
+// Helper
+DLL_EXPORT void lab4_free_string(const char* s);
 
 #ifdef __cplusplus
 }

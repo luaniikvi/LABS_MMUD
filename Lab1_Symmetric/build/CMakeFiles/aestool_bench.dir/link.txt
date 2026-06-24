@@ -1,1 +1,0 @@
-/mingw64/bin/c++.exe -Wl,--enable-auto-import -flto CMakeFiles/aestool_bench.dir/src/benchmark.cpp.o CMakeFiles/aestool_bench.dir/src/crypto_engine.cpp.o CMakeFiles/aestool_bench.dir/src/utils.cpp.o -o aestool_bench.exe -Wl,--out-implib,libaestool_bench.dll.a -Wl,--major-image-version,0,--minor-image-version,0  /e/MatMaUngDung/Labs/external/cryptopp/lib/libcryptopp.a

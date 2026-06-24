@@ -41,6 +41,8 @@ std::vector<uint8_t> compute_hmac(Algorithm algo, const uint8_t* key, size_t key
                                    const uint8_t* data, size_t data_len);
 std::vector<uint8_t> compute_hmac(Algorithm algo, const std::vector<uint8_t>& key,
                                    const std::vector<uint8_t>& data);
+std::vector<uint8_t> compute_hmac_stream(Algorithm algo, const std::vector<uint8_t>& key,
+                                          const std::string& filepath);
 
 // Convenience: MD5
 std::vector<uint8_t> compute_md5(const uint8_t* data, size_t len);

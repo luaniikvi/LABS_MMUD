@@ -1,0 +1,86 @@
+{
+  "description": "Lab 5 - Classical Digital Signatures KAT Test Vectors",
+  "algorithm": "ECDSA-P256-RSA-PSS",
+  "tests": [
+    {
+      "id": 1,
+      "description": "ECDSA P-256 sign/verify with SHA-256 - small text",
+      "algo": "ecdsa-p256",
+      "hash": "sha256",
+      "plaintext": "Hello, Digital Signatures!",
+      "expected_result": "success"
+    },
+    {
+      "id": 2,
+      "description": "ECDSA P-256 sign/verify with empty message",
+      "algo": "ecdsa-p256",
+      "hash": "sha256",
+      "plaintext": "",
+      "expected_result": "success"
+    },
+    {
+      "id": 3,
+      "description": "ECDSA P-384 sign/verify with SHA-384",
+      "algo": "ecdsa-p384",
+      "hash": "sha384",
+      "plaintext": "ECDSA P-384 test message",
+      "expected_result": "success"
+    },
+    {
+      "id": 4,
+      "description": "RSA-PSS-3072 sign/verify with SHA-256 - small text",
+      "algo": "rsa-pss-3072",
+      "hash": "sha256",
+      "plaintext": "Hello, RSA-PSS!",
+      "expected_result": "success"
+    },
+    {
+      "id": 5,
+      "description": "RSA-PSS-3072 sign/verify with empty message",
+      "algo": "rsa-pss-3072",
+      "hash": "sha256",
+      "plaintext": "",
+      "expected_result": "success"
+    },
+    {
+      "id": 6,
+      "description": "ECDSA P-256 with SHA-384 hash",
+      "algo": "ecdsa-p256",
+      "hash": "sha384",
+      "plaintext": "Cross-hash test",
+      "expected_result": "success"
+    },
+    {
+      "id": 7,
+      "description": "Large message (1 MiB) with ECDSA P-256",
+      "algo": "ecdsa-p256",
+      "hash": "sha256",
+      "plaintext_size": 1048576,
+      "expected_result": "success"
+    },
+    {
+      "id": 8,
+      "description": "Large message (1 MiB) with RSA-PSS-3072",
+      "algo": "rsa-pss-3072",
+      "hash": "sha256",
+      "plaintext_size": 1048576,
+      "expected_result": "success"
+    },
+    {
+      "id": 9,
+      "description": "Negative test - empty signature (should fail verification)",
+      "algo": "ecdsa-p256",
+      "hash": "sha256",
+      "plaintext": "test",
+      "expected_result": "fail"
+    },
+    {
+      "id": 10,
+      "description": "Message with special UTF-8 characters",
+      "algo": "ecdsa-p256",
+      "hash": "sha256",
+      "plaintext": "Hello 世界! ñoño 😀",
+      "expected_result": "success"
+    }
+  ]
+}

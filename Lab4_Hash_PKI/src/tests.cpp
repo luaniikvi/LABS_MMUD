@@ -50,7 +50,7 @@ TEST_CASE("SHA-2 Known Answer Tests", "[kat][sha2]") {
         auto algo = hash_engine::parse_algorithm(algo_name);
 
         std::vector<uint8_t> input;
-        if (test.contains("input_hex")) {
+        if (test.find("input_hex") != test.end()) {
             input = H(test["input_hex"].get<std::string>());
         } else {
             std::string s = test["input"].get<std::string>();

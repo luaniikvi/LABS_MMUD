@@ -23,7 +23,8 @@ void PrintBenchmarkHelp() {
               << std::thread::hardware_concurrency() << " detected).\n";
     std::cout << "  --iterations <N>    Number of iterations per benchmark (default: 30).\n";
     std::cout << "  --keysize <N>       RSA key size: 3072 or 4096 (default: 3072).\n";
-    std::cout << "  --verbose           Enable detailed output.\n\n";
+    std::cout << "  --verbose           Enable detailed output.\n";
+    std::cout << "  --warm <secs>       Warmup duration in seconds (default: 2.0).\n\n";
     std::cout << "EXAMPLES:\n";
     std::cout << "  benchmark_lab3\n";
     std::cout << "  benchmark_lab3 --threads 4 --iterations 50\n";
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
     int threads = 1;
     int iterations = 30;
     int keysize = 3072;
+    double warmup_secs = 2.0;
     bool verbose = false;
     
     for (int i = 1; i < argc; i++) {
@@ -53,6 +55,8 @@ int main(int argc, char* argv[]) {
             keysize = std::stoi(argv[++i]);
         } else if (arg == "--verbose") {
             verbose = true;
+        } else if (arg == "--warm" && i + 1 < argc) {
+            warmup_secs = std::stod(argv[++i]);
         } else {
             std::cerr << "[ERROR] Unknown argument: " << arg << "\n";
             std::cerr << "Use --help for usage information.\n";
@@ -68,7 +72,7 @@ int main(int argc, char* argv[]) {
     
     if (verbose) {
         std::cout << "[CONFIG] Threads: " << threads << ", Iterations: " << iterations 
-                  << ", Key size: " << keysize << " bits\n" << std::endl;
+                  << ", Key size: " << keysize << " bits, Warmup: " << warmup_secs << "s\n" << std::endl;
     }
     std::cout << "========================================" << std::endl;
     std::cout << "Lab 3 - RSA & Hybrid Encryption Benchmark" << std::endl;

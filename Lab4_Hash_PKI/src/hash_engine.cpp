@@ -4,6 +4,8 @@
 #include <cryptopp/sha.h>
 #include <cryptopp/sha3.h>
 #include <cryptopp/shake.h>
+
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <cryptopp/md5.h>
 #include <cryptopp/hmac.h>
 #include <cryptopp/filters.h>
@@ -76,7 +78,7 @@ size_t digest_size(Algorithm algo) {
         case Algorithm::SHA3_512:  return CryptoPP::SHA3_512::DIGESTSIZE;
         case Algorithm::SHAKE128:  return 0; // variable
         case Algorithm::SHAKE256:  return 0; // variable
-        case Algorithm::MD5:       return CryptoPP::MD5::DIGESTSIZE;
+        case Algorithm::MD5:       return CryptoPP::Weak1::MD5::DIGESTSIZE;
     }
     return 0;
 }
@@ -125,7 +127,7 @@ std::vector<uint8_t> compute_hash(Algorithm algo, const uint8_t* data, size_t le
             CryptoPP::SHA3_512 h; return hash_with(h, data, len);
         }
         case Algorithm::MD5: {
-            CryptoPP::MD5 h; return hash_with(h, data, len);
+            CryptoPP::Weak1::MD5 h; return hash_with(h, data, len);
         }
         case Algorithm::SHAKE128:
         case Algorithm::SHAKE256:
@@ -172,7 +174,7 @@ std::vector<uint8_t> compute_hash_stream(Algorithm algo, const std::string& file
         case Algorithm::SHA3_256: { CryptoPP::SHA3_256 h; return stream_hash_with(h, filepath); }
         case Algorithm::SHA3_384: { CryptoPP::SHA3_384 h; return stream_hash_with(h, filepath); }
         case Algorithm::SHA3_512: { CryptoPP::SHA3_512 h; return stream_hash_with(h, filepath); }
-        case Algorithm::MD5: { CryptoPP::MD5 h; return stream_hash_with(h, filepath); }
+        case Algorithm::MD5: { CryptoPP::Weak1::MD5 h; return stream_hash_with(h, filepath); }
         case Algorithm::SHAKE128:
         case Algorithm::SHAKE256:
             utils::fail_closed("Use compute_shake_stream() for SHAKE algorithms");
@@ -288,6 +290,58 @@ std::vector<uint8_t> compute_hmac(Algorithm algo, const uint8_t* key, size_t key
 std::vector<uint8_t> compute_hmac(Algorithm algo, const std::vector<uint8_t>& key,
                                    const std::vector<uint8_t>& data) {
     return compute_hmac(algo, key.data(), key.size(), data.data(), data.size());
+}
+
+std::vector<uint8_t> compute_hmac_stream(Algorithm algo, const std::vector<uint8_t>& key,
+                                          const std::string& filepath) {
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file.is_open()) {
+        utils::fail_closed("Cannot open file: " + filepath);
+    }
+    std::vector<char> buffer(STREAM_CHUNK_SIZE);
+
+    switch (algo) {
+        case Algorithm::SHA224: {
+            CryptoPP::HMAC<CryptoPP::SHA224> hmac(key.data(), key.size());
+            while (file.read(buffer.data(), STREAM_CHUNK_SIZE) || file.gcount() > 0) {
+                hmac.Update(reinterpret_cast<const uint8_t*>(buffer.data()), static_cast<size_t>(file.gcount()));
+            }
+            std::vector<uint8_t> mac(CryptoPP::SHA224::DIGESTSIZE);
+            hmac.Final(mac.data());
+            return mac;
+        }
+        case Algorithm::SHA256: {
+            CryptoPP::HMAC<CryptoPP::SHA256> hmac(key.data(), key.size());
+            while (file.read(buffer.data(), STREAM_CHUNK_SIZE) || file.gcount() > 0) {
+                hmac.Update(reinterpret_cast<const uint8_t*>(buffer.data()), static_cast<size_t>(file.gcount()));
+            }
+            std::vector<uint8_t> mac(CryptoPP::SHA256::DIGESTSIZE);
+            hmac.Final(mac.data());
+            return mac;
+        }
+        case Algorithm::SHA384: {
+            CryptoPP::HMAC<CryptoPP::SHA384> hmac(key.data(), key.size());
+            while (file.read(buffer.data(), STREAM_CHUNK_SIZE) || file.gcount() > 0) {
+                hmac.Update(reinterpret_cast<const uint8_t*>(buffer.data()), static_cast<size_t>(file.gcount()));
+            }
+            std::vector<uint8_t> mac(CryptoPP::SHA384::DIGESTSIZE);
+            hmac.Final(mac.data());
+            return mac;
+        }
+        case Algorithm::SHA512: {
+            CryptoPP::HMAC<CryptoPP::SHA512> hmac(key.data(), key.size());
+            while (file.read(buffer.data(), STREAM_CHUNK_SIZE) || file.gcount() > 0) {
+                hmac.Update(reinterpret_cast<const uint8_t*>(buffer.data()), static_cast<size_t>(file.gcount()));
+            }
+            std::vector<uint8_t> mac(CryptoPP::SHA512::DIGESTSIZE);
+            hmac.Final(mac.data());
+            return mac;
+        }
+        default:
+            utils::fail_closed("HMAC not supported for: " + algorithm_name(algo) +
+                               " (use SHA-224/256/384/512)");
+    }
+    return {};
 }
 
 // ============================================================================

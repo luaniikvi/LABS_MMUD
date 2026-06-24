@@ -132,7 +132,7 @@ void print_result(const BenchmarkResult& r) {
 void print_comparison_table(const std::vector<BenchmarkResult>& results) {
     std::cout << "\n";
     std::cout << std::left << std::setw(14) << "Algorithm"
-              << std::right << std::setw(12) << "Payload"
+              << std::right << std::setw(12) << "Payload(KB)"
               << std::setw(12) << "Mean(ms)"
               << std::setw(12) << "Median(ms)"
               << std::setw(12) << "StdDev"

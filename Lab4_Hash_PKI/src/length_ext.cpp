@@ -76,7 +76,7 @@ static std::vector<uint8_t> generate_padding(uint64_t total_byte_length) {
 
     // Pad to 56 bytes mod 64
     uint64_t mod = total_byte_length % 64;
-    size_t zeros_needed = (mod < 56) ? (56 - mod) : (64 + 56 - mod);
+    size_t zeros_needed = (mod <= 55) ? (55 - mod) : (119 - mod);
     for (size_t i = 0; i < zeros_needed; i++) {
         padding.push_back(0x00);
     }

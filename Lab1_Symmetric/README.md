@@ -25,15 +25,14 @@ An optional PyQt6 GUI (`gui_qt6.py`) is provided as a bonus extension, calling t
 
 ## Dependencies
 
-| Dependency   | Version             |
-|--------------|---------------------|
-| C++ Standard | C++17               |
-| CMake        | 3.15 or newer       |
-| Crypto++     | 8.x or newer        |
-| GCC (Ubuntu) | 9+ recommended      |
-| MSVC         | Visual Studio 2017+ |
-| MinGW-w64    | GCC 9+ recommended  |
-| PyQt6        | (optional, for GUI) |
+| Dependency   | Version               |
+|--------------|-----------------------|
+| C++ Standard | C++17                 |
+| CMake        | 3.15 or newer         |
+| Crypto++     | 8.9                   |
+| GCC (Ubuntu) | 9+ recommended        |
+| MSVC         | Visual Studio 18 2026 |
+| PyQt6        | (optional, for GUI)   |
 
 ### External Dependency Layout
 
@@ -60,7 +59,7 @@ cmake ..
 cmake --build .
 ```
 
-Executables: `build/aestool`, `build/aestool_tests`, `build/aestool_bench`, `build/libaestool.so`
+Executables: `build/aestool`, `build/catch2_test`, `build/benchmark`, `build/libaestool.so`
 
 ### Windows (MSVC)
 
@@ -71,7 +70,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Executables: `build\Release\aestool.exe`, `build\Release\aestool_tests.exe`, `build\Release\aestool_bench.exe`, `build\Release\aestool.dll`
+Executables: `build\Release\aestool.exe`, `build\Release\catch2_test.exe`, `build\Release\benchmark.exe`, `build\Release\aestool.dll`
 
 ### Windows (MSYS2 / MinGW64)
 
@@ -82,7 +81,7 @@ cmake ..
 cmake --build .
 ```
 
-Executables: `build\aestool.exe`, `build\aestool_tests.exe`, `build\aestool_bench.exe`, `build\aestool.dll`
+Executables: `build\aestool.exe`, `build\catch2_test.exe`, `build\benchmark.exe`, `build\aestool.dll`
 
 ### Build Targets
 
@@ -204,7 +203,7 @@ aestool encrypt \
 ### Run NIST KAT Tests
 
 ```bash
-aestool --kat SampleData/vectors.json
+aestool --kat test_vectors/vectors.json
 ```
 
 ### Verbose Mode
@@ -215,7 +214,6 @@ aestool encrypt \
   --text "secret" \
   --key-hex 00112233445566778899AABBCCDDEEFF \
   --iv 00112233445566778899AABB \
-  --aead \
   --verbose
 ```
 
@@ -258,7 +256,7 @@ Use `--threads N` to scale across CPU cores. Each thread receives a unique IV su
 
 Unit tests use [Catch2 v3](https://github.com/catchorg/Catch2) via local amalgamation (headers and source in `include/catch2/`).
 
-### Build and Run
+<!-- ### Build and Run
 
 ```bash
 mkdir build && cd build
@@ -275,7 +273,7 @@ ctest -V
 
 # Or run directly for per-test PASS/FAIL output
 ./aestool_tests
-```
+``` -->
 
 ### Test Coverage
 
@@ -461,7 +459,7 @@ The runner:
 * Prints `PASS` or `FAIL` per case
 * Prints a summary with total / passed / failed counts
 
-Coverage includes NIST SP 800-38A modes (CBC, CFB, OFB, CTR), GCM, CCM, and negative tests:
+Coverage includes NIST SP 800-38A modes (ECB, CBC, CFB, OFB, CTR), GCM, CCM, and negative tests:
 
 * Wrong key → incorrect plaintext or padding error
 * Wrong IV → incorrect plaintext

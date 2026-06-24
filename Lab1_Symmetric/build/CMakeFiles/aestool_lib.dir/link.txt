@@ -1,1 +1,0 @@
-/mingw64/bin/c++.exe -shared -Wl,--enable-auto-import -o aestool.dll -Wl,--out-implib,libaestool.dll.a -Wl,--major-image-version,0,--minor-image-version,0 CMakeFiles/aestool_lib.dir/src/dll_wrapper.cpp.o CMakeFiles/aestool_lib.dir/src/crypto_engine.cpp.o CMakeFiles/aestool_lib.dir/src/utils.cpp.o  /e/MatMaUngDung/Labs/external/cryptopp/lib/libcryptopp.a

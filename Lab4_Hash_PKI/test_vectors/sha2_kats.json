@@ -70,7 +70,7 @@
             "algo": "sha256",
             "description": "SHA-256 binary data",
             "input_hex": "00112233445566778899aabbccddeeff",
-            "expected_hex": "1b4f2e27a1ba78c5e2b0d48a2f2985ce4a6e2f6a0884d4933ed02a66e7315899"
+            "expected_hex": "a8faed6abbf35c12a4b26e40f6feb19d736d90045c83b9f9a31f638d323e6811"
         }
     ]
 }

@@ -1,0 +1,193 @@
+{
+  "lab": "Lab 1 - AES Symmetric Encryption Engine",
+  "test_suite": "NIST Known Answer Tests & Negative Testing Vectors",
+  "references": [
+    "NIST SP 800-38A (2001): Recommendation for Block Cipher Modes of Operation",
+    "NIST SP 800-38D (2007): Recommendation for Block Cipher Modes of Operation: GCM and GMAC",
+    "NIST SP 800-38C (2004): Recommendation for Block Cipher Modes of Operation: CCM"
+  ],
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "name": "AES-128-ECB Multi-Block Encryption",
+      "source": "NIST SP 800-38A, Appendix F.1 (adapted)",
+      "mode": "ecb",
+      "expected_result": "PASS",
+      "key_hex": "2b7e151628aed2a6abf7158809cf4f3c",
+      "iv_hex": "",
+      "plaintext_hex": "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e5130c81c46a35ce411",
+      "ciphertext_hex": "3ad77bb40d7a3660a89ecaf32466ef97f5d3d58503b9699de785895a96fdbaaf5b694713856763534d3b6f1e917bfc5a"
+    },
+    {
+      "id": "TC-002",
+      "name": "AES-256-CBC Standard Test Vector",
+      "source": "NIST SP 800-38A, Appendix F.2.5 (adapted)",
+      "mode": "cbc",
+      "expected_result": "PASS",
+      "key_hex": "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914df1a",
+      "iv_hex": "000102030405060708090a0b0c0d0e0f",
+      "plaintext": "Single block test",
+      "plaintext_hex": "53696e676c6520626c6f636b2074657374",
+      "ciphertext_hex": "42e1859788faa2073337ebab6790d1b8e449439f2327f4a4c65699e4e6786aed"
+    },
+    {
+      "id": "TC-003",
+      "name": "AES-256-CTR Standard Stream Vector",
+      "source": "NIST SP 800-38A, Appendix F.5.5 (adapted)",
+      "mode": "ctr",
+      "expected_result": "PASS",
+      "key_hex": "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914df1a",
+      "iv_hex": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "plaintext": "Testing the CTR stream generation",
+      "plaintext_hex": "54657374696e6720746865204354522073747265616d2067656e65726174696f6e",
+      "ciphertext_hex": "7811dcf706bfbd5e06803706c44df7cab49eeaf361aa29ddfd13d920ecd23b8c77"
+    },
+    {
+      "id": "TC-004",
+      "name": "AES-256-OFB Stream Mode Vector",
+      "source": "NIST SP 800-38A, Appendix F.4.5 (adapted)",
+      "mode": "ofb",
+      "expected_result": "PASS",
+      "key_hex": "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914df1a",
+      "iv_hex": "00112233445566778899aabbccddeeff",
+      "plaintext": "Cryptographic Labs Specification",
+      "plaintext_hex": "43727970746f67726170686963204c6162732053706563696669636174696f6e",
+      "ciphertext_hex": "f9f0c23d0285af0bd2f96b5efcc6507918217f2c6e5aed1deed3fc2925d13c61"
+    },
+    {
+      "id": "TC-005",
+      "name": "AES-256-CFB Feedback Mode Vector",
+      "source": "NIST SP 800-38A, Appendix F.3.17 (adapted)",
+      "mode": "cfb",
+      "expected_result": "PASS",
+      "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "iv_hex": "00112233445566778899aabbccddeeff",
+      "plaintext": "Symmetric Engine CFB",
+      "plaintext_hex": "53796d6d657472696320456e67696e6520434642",
+      "ciphertext_hex": "dddbdaa7341337d689dc0cfe2c200eec7212cd7e"
+    },
+    {
+      "id": "TC-006",
+      "name": "AES-256-XTS Double-Key Data Unit Vector",
+      "source": "IEEE 1619-2007 XTS-AES",
+      "mode": "xts",
+      "expected_result": "PASS",
+      "key_hex": "11111111111111111111111111111111111111111111111111111111111111112222222222222222222222222222222222222222222222222222222222222222",
+      "iv_hex": "33333333333333333333333333333333",
+      "plaintext": "XTS requires exact 16-byte aligned data chunks",
+      "plaintext_hex": "5854532072657175697265732065786163742031362d6279746520616c69676e65642064617461206368756e6b73",
+      "ciphertext_hex": "7634057838ea87a134dff6f1893853f600ffa68d1d92545868d3b3350fd8565dad3dcc7f12c41b4108c55cdc83e5"
+    },
+    {
+      "id": "TC-007",
+      "name": "AES-256-GCM Authenticated Encryption (AEAD)",
+      "source": "NIST SP 800-38D, Test Case 3 (adapted)",
+      "mode": "gcm",
+      "expected_result": "PASS",
+      "key_hex": "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+      "iv_hex": "cafebabefacedbaddecaf888",
+      "aad_text": "KMA-Authenticated-Data",
+      "plaintext": "Secure Authenticated Encryption String",
+      "plaintext_hex": "5365637572652041757468656e7469636174656420456e6372797074696f6e20537472696e67",
+      "ciphertext_hex": "d87990a013b75ba324525603eb050d8483e940eb8a94597029ade2f4c60b35f8c3f8f0b4a202",
+      "tag_hex": "b64bd1c3b1b2f3624357d8566efafa98"
+    },
+    {
+      "id": "TC-008",
+      "name": "AES-256-CCM Authenticated Mode",
+      "source": "NIST SP 800-38C, Example CCM Vector",
+      "mode": "ccm",
+      "expected_result": "PASS",
+      "key_hex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "iv_hex": "10111213141516",
+      "aad_text": "Lab1-Data",
+      "plaintext": "CCM Verification Data Package",
+      "plaintext_hex": "43434d20566572696669636174696f6e2044617461205061636b616765",
+      "ciphertext_hex": "e9d3c77784c56b6a0de5dc4aafc956663d186a98f3c580075ce35c5c9b",
+      "tag_hex": "27a61371f6979497ca59ae52a2c0e213"
+    },
+    {
+      "id": "NEG-001",
+      "name": "Negative: Wrong Key (CBC) - must produce wrong plaintext",
+      "mode": "cbc",
+      "expected_result": "FAIL",
+      "key_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "iv_hex": "000102030405060708090a0b0c0d0e0f",
+      "plaintext": "Should result in garbage or padding error",
+      "plaintext_hex": "53686f756c6420726573756c7420696e2067617262616765206f722070616464696e67206572726f72",
+      "ciphertext_hex": "6fb5ff22666144e18374d896263f3506cf9b50668b556b677a2cb1db0c8be0bb"
+    },
+    {
+      "id": "NEG-002",
+      "name": "Negative: Tampered Ciphertext (GCM AEAD) - tag must fail",
+      "mode": "gcm",
+      "expected_result": "FAIL",
+      "key_hex": "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+      "iv_hex": "cafebabefacedbaddecaf888",
+      "aad_text": "KMA-Authenticated-Data",
+      "plaintext": "Secure Authenticated Encryption String",
+      "plaintext_hex": "5365637572652041757468656e7469636174656420456e6372797074696f6e20537472696e67",
+      "ciphertext_hex": "ffffffff21777408d3e670409c916b9b3804b40742cd28148e10d29a597a7a582310b192",
+      "tag_hex": "4d1a293bcf8129dca394b91acdef1248"
+    },
+    {
+      "id": "NEG-003",
+      "name": "Negative: Tampered Authentication Tag (GCM) - tag must fail",
+      "mode": "gcm",
+      "expected_result": "FAIL",
+      "key_hex": "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+      "iv_hex": "cafebabefacedbaddecaf888",
+      "aad_text": "KMA-Authenticated-Data",
+      "plaintext": "Secure Authenticated Encryption String",
+      "plaintext_hex": "5365637572652041757468656e7469636174656420456e6372797074696f6e20537472696e67",
+      "ciphertext_hex": "42831ec221777408d3e670409c916b9b3804b40742cd28148e10d29a597a7a582310b192",
+      "tag_hex": "00000000000000000000000000000000"
+    },
+    {
+      "id": "NEG-004",
+      "name": "Negative: Short Key (3 bytes) for CBC - must reject",
+      "mode": "cbc",
+      "expected_result": "FAIL",
+      "key_hex": "001122",
+      "iv_hex": "000102030405060708090a0b0c0d0e0f",
+      "plaintext": "Invalid Key Size",
+      "plaintext_hex": "496e76616c6964204b65792053697a65",
+      "ciphertext_hex": "6fb5ff22666144e18374d896263f3506cf9b50668b556b677a2cb1db0c8be0bb"
+    },
+    {
+      "id": "NEG-005",
+      "name": "Negative: Wrong IV (CBC) - must produce wrong plaintext",
+      "mode": "cbc",
+      "expected_result": "FAIL",
+      "key_hex": "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914df1a",
+      "iv_hex": "ffffffffffffffffffffffffffffffff",
+      "plaintext": "Single block test",
+      "plaintext_hex": "53696e676c6520626c6f636b2074657374",
+      "ciphertext_hex": "42e1859788faa2073337ebab6790d1b8e449439f2327f4a4c65699e4e6786aed"
+    },
+    {
+      "id": "NEG-006",
+      "name": "Negative: Invalid IV Length for GCM (17 bytes, must be 12) - must reject",
+      "mode": "gcm",
+      "expected_result": "FAIL",
+      "key_hex": "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+      "iv_hex": "000102030405060708090a0b0c0d0e0f10",
+      "aad_text": "KMA-Authenticated-Data",
+      "plaintext": "Secure Authenticated Encryption String",
+      "plaintext_hex": "5365637572652041757468656e7469636174656420456e6372797074696f6e20537472696e67",
+      "ciphertext_hex": "42831ec221777408d3e670409c916b9b3804b40742cd28148e10d29a597a7a582310b192",
+      "tag_hex": "b64bd1c3b1b2f3624357d8566efafa98"
+    },
+    {
+      "id": "NEG-007",
+      "name": "Negative: Tampered Ciphertext (CBC, non-AEAD) - must produce wrong plaintext",
+      "mode": "cbc",
+      "expected_result": "FAIL",
+      "key_hex": "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914df1a",
+      "iv_hex": "000102030405060708090a0b0c0d0e0f",
+      "plaintext": "Single block test",
+      "plaintext_hex": "53696e676c6520626c6f636b2074657374",
+      "ciphertext_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+}

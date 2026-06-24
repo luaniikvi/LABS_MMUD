@@ -1,0 +1,60 @@
+{
+  "description": "Lab 6 - Post-Quantum Cryptography KAT Test Vectors",
+  "algorithm": "ML-DSA-44-ML-KEM-512",
+  "tests": [
+    {
+      "id": 1,
+      "description": "ML-DSA-44 sign/verify with SHA-256 - small text",
+      "algo": "mldsa-44",
+      "hash": "sha256",
+      "plaintext": "Hello, Post-Quantum Cryptography!",
+      "expected_result": "success"
+    },
+    {
+      "id": 2,
+      "description": "ML-DSA-44 sign/verify with empty message",
+      "algo": "mldsa-44",
+      "hash": "sha256",
+      "plaintext": "",
+      "expected_result": "success"
+    },
+    {
+      "id": 3,
+      "description": "ML-DSA-65 sign/verify with SHA-256",
+      "algo": "mldsa-65",
+      "hash": "sha256",
+      "plaintext": "ML-DSA-65 test with higher security",
+      "expected_result": "success"
+    },
+    {
+      "id": 4,
+      "description": "ML-KEM-512 encaps/decaps roundtrip",
+      "algo": "mlkem-512",
+      "expected_result": "success"
+    },
+    {
+      "id": 5,
+      "description": "ML-DSA-44 large message (1 MiB)",
+      "algo": "mldsa-44",
+      "hash": "sha256",
+      "plaintext_size": 1048576,
+      "expected_result": "success"
+    },
+    {
+      "id": 6,
+      "description": "ML-DSA-44 with UTF-8 special characters",
+      "algo": "mldsa-44",
+      "hash": "sha256",
+      "plaintext": "Hello 世界! ñoño 😀 PQC is here!",
+      "expected_result": "success"
+    },
+    {
+      "id": 7,
+      "description": "ML-DSA-44 negative test - wrong key type",
+      "algo": "mldsa-44",
+      "hash": "sha256",
+      "plaintext": "test",
+      "expected_result": "fail"
+    }
+  ]
+}

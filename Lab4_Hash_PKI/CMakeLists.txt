@@ -24,12 +24,15 @@ endif()
 if(MSVC)
     message(STATUS "[Lab4] Compiling with MSVC")
     set(COMPILER_NAME "msvc")
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 elseif(MINGW)
     message(STATUS "[Lab4] Compiling with MinGW (MSYS2)")
     set(COMPILER_NAME "mingw")
+    # Statically link MinGW runtime so no libgcc/libstdc++/libwinpthread DLLs needed
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -static -lpthread")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++ -static -lpthread")
+    
+    # Find MinGW bin directory for DLL fallback copy
     get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
     message(STATUS "[Lab4] MinGW bin dir: ${MINGW_BIN_DIR}")
 else()
@@ -41,17 +44,24 @@ endif()
 # Catch2 — local amalgamation
 # ------------------------------------------------------------------------------
 if(NOT TARGET Catch2::Catch2WithMain)
-    set(CATCH2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include/catch2")
+    set(CATCH2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
     add_library(Catch2WithMain_lab4 STATIC
-        "${CATCH2_DIR}/catch_amalgamated.cpp"
+        "${CATCH2_DIR}/catch2/catch_amalgamated.cpp"
     )
     target_include_directories(Catch2WithMain_lab4 PUBLIC "${CATCH2_DIR}")
     target_compile_features(Catch2WithMain_lab4 PUBLIC cxx_std_17)
+    
+    if(MSVC)
+        set_target_properties(Catch2WithMain_lab4 PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+        )
+    endif()
+    
     add_library(Catch2::Catch2WithMain ALIAS Catch2WithMain_lab4)
 endif()
 
 # ------------------------------------------------------------------------------
-# Crypto++
+# Crypto++ Dependency
 # ------------------------------------------------------------------------------
 set(CRYPTOPP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../external/cryptopp")
 set(CRYPTOPP_INCLUDE_DIR "${CRYPTOPP_ROOT}/include")
@@ -76,8 +86,11 @@ elseif(MINGW OR CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
         message(FATAL_ERROR "[Lab4] Crypto++ library not found at ${CRYPTOPP_LIB}")
     endif()
 else()
-    find_library(CRYPTOPP_LIB NAMES cryptopp libcryptopp
-        PATHS "${CRYPTOPP_ROOT}/lib" "${CRYPTOPP_ROOT}" NO_DEFAULT_PATH)
+    find_library(CRYPTOPP_LIB
+        NAMES cryptopp libcryptopp
+        PATHS "${CRYPTOPP_ROOT}/lib" "${CRYPTOPP_ROOT}"
+        NO_DEFAULT_PATH
+    )
     if(NOT CRYPTOPP_LIB)
         message(FATAL_ERROR "[Lab4] Crypto++ library not found in ${CRYPTOPP_ROOT}")
     endif()
@@ -85,159 +98,190 @@ else()
 endif()
 
 # ------------------------------------------------------------------------------
-# OpenSSL (for X.509 parsing)
+# OpenSSL Dependency
 # ------------------------------------------------------------------------------
 set(OPENSSL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../external/openssl")
 set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT}/include")
 
 if(MSVC)
     set(OPENSSL_CRYPTO_LIB "${OPENSSL_ROOT}/lib64/libcrypto_static.lib")
+    set(OPENSSL_SSL_LIB "${OPENSSL_ROOT}/lib64/libssl_static.lib")
     if(EXISTS "${OPENSSL_CRYPTO_LIB}")
+        set(OPENSSL_LIBS "${OPENSSL_CRYPTO_LIB}" "${OPENSSL_SSL_LIB}")
         message(STATUS "[Lab4] Found OpenSSL (MSVC): ${OPENSSL_CRYPTO_LIB}")
     else()
-        message(FATAL_ERROR "[Lab4] OpenSSL libcrypto not found at ${OPENSSL_CRYPTO_LIB}")
+        message(FATAL_ERROR "[Lab4] OpenSSL library not found at ${OPENSSL_CRYPTO_LIB}")
     endif()
-elseif(MINGW)
+elseif(MINGW OR CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
     set(OPENSSL_CRYPTO_LIB "${OPENSSL_ROOT}/lib64/libcrypto.a")
+    set(OPENSSL_SSL_LIB "${OPENSSL_ROOT}/lib64/libssl.a")
     if(EXISTS "${OPENSSL_CRYPTO_LIB}")
-        message(STATUS "[Lab4] Found OpenSSL (MinGW): ${OPENSSL_CRYPTO_LIB}")
+        set(OPENSSL_LIBS "${OPENSSL_CRYPTO_LIB}" "${OPENSSL_SSL_LIB}")
+        message(STATUS "[Lab4] Found OpenSSL (MinGW/Linux): ${OPENSSL_CRYPTO_LIB}")
     else()
-        message(FATAL_ERROR "[Lab4] OpenSSL libcrypto not found at ${OPENSSL_CRYPTO_LIB}")
+        message(FATAL_ERROR "[Lab4] OpenSSL library not found at ${OPENSSL_CRYPTO_LIB}")
     endif()
 else()
-    find_library(OPENSSL_CRYPTO_LIB NAMES crypto libcrypto
-        PATHS "${OPENSSL_ROOT}/lib64" "${OPENSSL_ROOT}/lib" NO_DEFAULT_PATH)
+    find_library(OPENSSL_CRYPTO_LIB NAMES crypto PATHS "${OPENSSL_ROOT}/lib64" "${OPENSSL_ROOT}/lib" NO_DEFAULT_PATH)
+    find_library(OPENSSL_SSL_LIB NAMES ssl PATHS "${OPENSSL_ROOT}/lib64" "${OPENSSL_ROOT}/lib" NO_DEFAULT_PATH)
     if(NOT OPENSSL_CRYPTO_LIB)
-        message(FATAL_ERROR "[Lab4] OpenSSL libcrypto not found")
+        message(FATAL_ERROR "[Lab4] OpenSSL crypto library not found in ${OPENSSL_ROOT}")
     endif()
+    set(OPENSSL_LIBS "${OPENSSL_CRYPTO_LIB}" "${OPENSSL_SSL_LIB}")
     message(STATUS "[Lab4] Found OpenSSL: ${OPENSSL_CRYPTO_LIB}")
 endif()
 
-# Windows-specific libraries needed by OpenSSL
-if(WIN32)
-    set(OPENSSL_EXTRA_LIBS ws2_32 crypt32 advapi32 user32)
-else()
-    set(OPENSSL_EXTRA_LIBS dl pthread)
-endif()
-
-# Common include directories
-set(COMMON_INCLUDES
-    ${CRYPTOPP_INCLUDE_DIR}
-    ${OPENSSL_INCLUDE_DIR}
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-)
-
-# Common link libraries
-set(COMMON_LIBS
-    ${CRYPTOPP_LIB}
-    ${OPENSSL_CRYPTO_LIB}
-    ${OPENSSL_EXTRA_LIBS}
-)
-
-# Common source files
-set(COMMON_SOURCES
-    src/hash_engine.cpp
-    src/x509_parser.cpp
-    src/length_ext.cpp
-    src/utils.cpp
-)
-
-# Suppress MSVC deprecation warnings for fopen, strncpy, etc.
 if(MSVC)
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    # Static OpenSSL on MSVC pulls in Winsock/Crypto APIs plus legacy stdio names
+    list(APPEND OPENSSL_LIBS ws2_32 crypt32 wintrust advapi32 legacy_stdio_definitions.lib)
 endif()
 
-# OpenSSL static lib imports __imp_* CRT symbols (built with /MD).
-# Force linker to resolve these from ucrt at runtime; /FORCE:MULTIPLE
-# suppresses duplicate symbol errors from mixing static/dynamic CRT.
-if(MSVC)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /FORCE:MULTIPLE")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /FORCE:MULTIPLE")
-    list(APPEND OPENSSL_EXTRA_LIBS ucrt vcruntime)
-endif()
+# Threads package
+find_package(Threads REQUIRED)
 
 # ------------------------------------------------------------------------------
 # hashtool executable
 # ------------------------------------------------------------------------------
 add_executable(hashtool
     src/main.cpp
-    ${COMMON_SOURCES}
+    src/hash_engine.cpp
+    src/hash_engine.hpp
+    src/x509_parser.cpp
+    src/x509_parser.hpp
+    src/length_ext.cpp
+    src/length_ext.hpp
+    src/utils.cpp
+    src/utils.hpp
+    src/applink.c
 )
 
-target_include_directories(hashtool PRIVATE ${COMMON_INCLUDES})
-target_link_libraries(hashtool PRIVATE ${COMMON_LIBS})
+target_include_directories(hashtool PRIVATE
+    ${CRYPTOPP_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
 
+target_link_libraries(hashtool PRIVATE
+    ${CRYPTOPP_LIB}
+    ${OPENSSL_LIBS}
+    Threads::Threads
+)
+
+# Compiler-specific warning flags
 if(MSVC)
     target_compile_options(hashtool PRIVATE /W4 /WX-)
-    target_link_options(hashtool PRIVATE /FORCE:MULTIPLE)
-    set_property(TARGET hashtool APPEND_STRING PROPERTY LINK_FLAGS " /FORCE:MULTIPLE")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(hashtool PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
 endif()
 
+install(TARGETS hashtool RUNTIME DESTINATION bin)
+
 # ------------------------------------------------------------------------------
-# Unit Tests
+# catch2_test executable
 # ------------------------------------------------------------------------------
 add_executable(catch2_test
     src/tests.cpp
-    ${COMMON_SOURCES}
+    src/hash_engine.cpp
+    src/hash_engine.hpp
+    src/x509_parser.cpp
+    src/x509_parser.hpp
+    src/length_ext.cpp
+    src/length_ext.hpp
+    src/utils.cpp
+    src/utils.hpp
+    src/applink.c
 )
 
-target_include_directories(catch2_test PRIVATE ${COMMON_INCLUDES})
-target_link_libraries(catch2_test PRIVATE ${COMMON_LIBS} Catch2::Catch2WithMain)
+target_include_directories(catch2_test PRIVATE
+    ${CRYPTOPP_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(catch2_test PRIVATE
+    ${CRYPTOPP_LIB}
+    ${OPENSSL_LIBS}
+    Catch2::Catch2WithMain
+    Threads::Threads
+)
 
 if(MSVC)
     target_compile_options(catch2_test PRIVATE /W4 /WX-)
-    target_link_options(catch2_test PRIVATE /FORCE:MULTIPLE)
-    set_property(TARGET catch2_test APPEND_STRING PROPERTY LINK_FLAGS " /FORCE:MULTIPLE")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(catch2_test PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
 endif()
 
-enable_testing()
+# Register tests with CTest
 add_test(NAME Lab4_Tests COMMAND catch2_test WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # ------------------------------------------------------------------------------
-# Benchmark executable
+# benchmark executable
 # ------------------------------------------------------------------------------
 add_executable(benchmark
     src/benchmark_main.cpp
     src/benchmark.cpp
+    src/benchmark.hpp
     src/hash_engine.cpp
+    src/hash_engine.hpp
     src/utils.cpp
+    src/utils.hpp
 )
 
-target_include_directories(benchmark PRIVATE ${COMMON_INCLUDES})
-target_link_libraries(benchmark PRIVATE ${COMMON_LIBS})
+target_include_directories(benchmark PRIVATE
+    ${CRYPTOPP_INCLUDE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(benchmark PRIVATE
+    ${CRYPTOPP_LIB}
+    Threads::Threads
+)
+
+# Optimization flags for benchmark
+if(MSVC)
+    target_compile_options(benchmark PRIVATE /O2 /Oi /Ot /GL)
+    target_link_options(benchmark PRIVATE /LTCG)
+else()
+    target_compile_options(benchmark PRIVATE -O3 -march=native -mtune=native)
+    target_link_options(benchmark PRIVATE -flto)
+endif()
 
 if(MSVC)
     target_compile_options(benchmark PRIVATE /W4 /WX-)
-    target_link_options(benchmark PRIVATE /FORCE:MULTIPLE)
-    set_property(TARGET benchmark APPEND_STRING PROPERTY LINK_FLAGS " /FORCE:MULTIPLE")
-    # Compiler optimizations for benchmark
-    target_compile_options(benchmark PRIVATE /O2 /Oi /Ot /GL)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(benchmark PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
-    target_compile_options(benchmark PRIVATE -O3 -march=native -mtune=native)
 endif()
 
+install(TARGETS benchmark RUNTIME DESTINATION bin)
+
 # ------------------------------------------------------------------------------
-# DLL Library for Python GUI
+# DLL Library for Python GUI (hashtool_lib)
 # ------------------------------------------------------------------------------
 add_library(hashtool_lib SHARED
     src/dll_wrapper.cpp
-    ${COMMON_SOURCES}
+    src/hash_engine.cpp
+    src/x509_parser.cpp
+    src/length_ext.cpp
+    src/utils.cpp
+    src/applink.c
 )
 
-target_include_directories(hashtool_lib PRIVATE ${COMMON_INCLUDES})
-target_link_libraries(hashtool_lib PRIVATE ${COMMON_LIBS})
+target_include_directories(hashtool_lib PRIVATE
+    ${CRYPTOPP_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(hashtool_lib PRIVATE
+    ${CRYPTOPP_LIB}
+    ${OPENSSL_LIBS}
+    Threads::Threads
+)
 
 target_compile_definitions(hashtool_lib PRIVATE BUILDING_DLL)
 
 if(MSVC)
     target_compile_options(hashtool_lib PRIVATE /W4)
-    target_link_options(hashtool_lib PRIVATE /FORCE:MULTIPLE)
-    set_property(TARGET hashtool_lib APPEND_STRING PROPERTY LINK_FLAGS " /FORCE:MULTIPLE")
 else()
     target_compile_options(hashtool_lib PRIVATE -Wall -Wextra -pedantic)
 endif()
@@ -248,7 +292,7 @@ set_target_properties(hashtool_lib PROPERTIES
 )
 
 # ------------------------------------------------------------------------------
-# Post-build auto-copy runtime DLLs (MinGW only, not MSVC)
+# MinGW: Post-build auto-copy runtime DLLs to build directory
 # ------------------------------------------------------------------------------
 if(NOT MSVC)
     get_filename_component(MINGW_RUNTIME_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)

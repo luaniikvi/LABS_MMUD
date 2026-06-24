@@ -147,7 +147,7 @@ class BenchmarkWorker(QThread):
     
     def run(self):
         try:
-            exe = resolve_exe_path(self.build_dir, "aestool_bench.exe")
+            exe = resolve_exe_path(self.build_dir, "benchmark.exe")
             if not os.path.exists(exe):
                 self.progress.emit(f"[ERROR] Benchmark executable not found: {exe}")
                 self.progress.emit(f"[HINT] Build with: cmake --build . --config Release")
@@ -206,7 +206,7 @@ class TestWorker(QThread):
     
     def run(self):
         try:
-            exe = resolve_exe_path(self.build_dir, "aestool_tests.exe")
+            exe = resolve_exe_path(self.build_dir, "catch2_test.exe")
             if not os.path.exists(exe):
                 self.progress.emit(f"[ERROR] Test executable not found: {exe}")
                 self.progress.emit(f"[HINT] Build with: cmake --build . --config Release")
@@ -696,7 +696,7 @@ class CryptoApp(QMainWindow):
         self.kat_path_entry = QLineEdit()
         self.kat_path_entry.setPlaceholderText("Path to vectors.json\u2026")
         _base = os.path.dirname(os.path.abspath(__file__))
-        for p in ["SampleData/vectors.json", "build/vectors.json", "vectors.json"]:
+        for p in ["test_vectors/vectors.json", "build/vectors.json", "vectors.json"]:
             full = os.path.join(_base, p)
             if os.path.exists(full):
                 self.kat_path_entry.setText(full)

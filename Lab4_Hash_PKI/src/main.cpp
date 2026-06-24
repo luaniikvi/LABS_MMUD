@@ -102,25 +102,80 @@ static CLIArgs parse_args(int argc, char* argv[]) {
             print_usage();
             std::exit(0);
         }
-        else if (arg == "--algo" && i + 1 < argc) args.algo = argv[++i];
-        else if (arg == "--in" && i + 1 < argc) args.in_file = argv[++i];
-        else if (arg == "--text" && i + 1 < argc) args.text = argv[++i];
-        else if (arg == "--out" && i + 1 < argc) args.out_file = argv[++i];
-        else if (arg == "--stream") args.stream = true;
-        else if (arg == "--outlen" && i + 1 < argc) args.outlen = std::stoi(argv[++i]);
-        else if (arg == "--encode" && i + 1 < argc) args.encode = argv[++i];
-        else if (arg == "--key" && i + 1 < argc) args.key_file = argv[++i];
-        else if (arg == "--key-hex" && i + 1 < argc) args.key_hex = argv[++i];
-        else if (arg == "--cert" && i + 1 < argc) args.cert_file = argv[++i];
-        else if (arg == "--issuer-key" && i + 1 < argc) args.issuer_key = argv[++i];
-        else if (arg == "--kat" && i + 1 < argc) { args.kat_file = argv[++i]; args.command = "--kat"; }
-        else if (arg == "--dir" && i + 1 < argc) args.dir_path = argv[++i];
-        else if (arg == "--mac" && i + 1 < argc) args.mac_hex = argv[++i];
-        else if (arg == "--key-len" && i + 1 < argc) args.key_len = std::stoi(argv[++i]);
-        else if (arg == "--msg-len" && i + 1 < argc) args.msg_len = std::stoi(argv[++i]);
-        else if (arg == "--append" && i + 1 < argc) args.append_data = argv[++i];
-        else if (arg == "--verbose") args.verbose = true;
-        else if (arg[0] != '-' && args.command.empty()) args.command = arg;
+        else if (arg == "--algo") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --algo");
+            args.algo = argv[++i];
+        }
+        else if (arg == "--in") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --in");
+            args.in_file = argv[++i];
+        }
+        else if (arg == "--text") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --text");
+            args.text = argv[++i];
+        }
+        else if (arg == "--out") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --out");
+            args.out_file = argv[++i];
+        }
+        else if (arg == "--stream") {
+            args.stream = true;
+        }
+        else if (arg == "--outlen") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --outlen");
+            args.outlen = std::stoi(argv[++i]);
+        }
+        else if (arg == "--encode") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --encode");
+            args.encode = argv[++i];
+        }
+        else if (arg == "--key") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --key");
+            args.key_file = argv[++i];
+        }
+        else if (arg == "--key-hex") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --key-hex");
+            args.key_hex = argv[++i];
+        }
+        else if (arg == "--cert") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --cert");
+            args.cert_file = argv[++i];
+        }
+        else if (arg == "--issuer-key") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --issuer-key");
+            args.issuer_key = argv[++i];
+        }
+        else if (arg == "--kat") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --kat");
+            args.kat_file = argv[++i];
+            args.command = "--kat";
+        }
+        else if (arg == "--dir") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --dir");
+            args.dir_path = argv[++i];
+        }
+        else if (arg == "--mac") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --mac");
+            args.mac_hex = argv[++i];
+        }
+        else if (arg == "--key-len") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --key-len");
+            args.key_len = std::stoi(argv[++i]);
+        }
+        else if (arg == "--msg-len") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --msg-len");
+            args.msg_len = std::stoi(argv[++i]);
+        }
+        else if (arg == "--append") {
+            if (i + 1 >= argc) lab4::utils::fail_closed("Missing parameter value for --append");
+            args.append_data = argv[++i];
+        }
+        else if (arg == "--verbose") {
+            args.verbose = true;
+        }
+        else if (arg[0] != '-' && args.command.empty()) {
+            args.command = arg;
+        }
         else {
             lab4::utils::fail_closed("Unknown argument: " + arg);
         }
@@ -260,11 +315,21 @@ static void cmd_x509(const CLIArgs& args) {
     auto info = lab4::x509::parse_certificate(args.cert_file);
     std::cout << lab4::x509::format_cert_info(info);
 
-    // Verify signature if issuer key provided
+    // Verify signature
     if (!args.issuer_key.empty()) {
         bool valid = lab4::x509::verify_signature(args.cert_file, args.issuer_key);
-        std::cout << "\nSignature Verification: "
-                  << (valid ? "VALID" : "INVALID") << std::endl;
+        if (!valid) {
+            lab4::utils::fail_closed("Signature Verification: INVALID");
+        }
+        std::cout << "\nSignature Verification: VALID" << std::endl;
+    } else {
+        // Issuer key is unavailable
+        bool valid = lab4::x509::verify_signature(args.cert_file, "");
+        if (valid) {
+            std::cout << "\nSignature Verification: VALID (Self-Signed)" << std::endl;
+        } else {
+            lab4::utils::fail_closed("Signature Verification: FAILED (Certificate is not self-signed and issuer key is unavailable).");
+        }
     }
 }
 
@@ -442,14 +507,39 @@ int main(int argc, char* argv[]) {
         CLIArgs args = parse_args(argc, argv);
 
         if (args.command.empty() && args.kat_file.empty()) {
-            print_usage();
-            return 0;
+            if (argc == 1) {
+                print_usage();
+                return 0;
+            }
+
+            // Try to deduce the command from specified flags
+            if (!args.cert_file.empty()) {
+                args.command = "x509";
+            } else if (!args.mac_hex.empty() || args.key_len > 0 || args.msg_len > 0 || !args.append_data.empty()) {
+                args.command = "length-ext";
+            } else if (!args.dir_path.empty()) {
+                args.command = "md5-demo";
+            } else if (!args.key_hex.empty() || !args.key_file.empty()) {
+                args.command = "hmac";
+            } else if (args.outlen > 0) {
+                args.command = "shake";
+            } else {
+                // Default to hash or shake depending on algo
+                std::string algo_lower = args.algo;
+                std::transform(algo_lower.begin(), algo_lower.end(), algo_lower.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (algo_lower.find("shake") != std::string::npos) {
+                    args.command = "shake";
+                } else {
+                    args.command = "hash";
+                }
+            }
         }
 
         // Check for SHAKE via algo name
         std::string algo_lower = args.algo;
         std::transform(algo_lower.begin(), algo_lower.end(), algo_lower.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (algo_lower.find("shake") != std::string::npos && args.command == "hash") {
             args.command = "shake";
         }

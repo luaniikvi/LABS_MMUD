@@ -40,7 +40,7 @@ if(NOT TARGET Catch2::Catch2)
     # Match the runtime library setting to avoid LNK2038 errors
     if(MSVC)
         set_target_properties(Catch2WithMain_local PROPERTIES
-            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
         )
     endif()
     
@@ -62,7 +62,7 @@ set(CRYPTOPP_INCLUDE_DIR
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
-        "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
     set(CRYPTOPP_LIB
         "${CRYPTOPP_ROOT}/lib/cryptopp.lib"
     )
@@ -166,53 +166,53 @@ target_link_libraries(aestool_lib PRIVATE Threads::Threads)
 # Unit Tests (Catch2)
 # ------------------------------------------------------------------------------
 
-add_executable(aestool_tests
+add_executable(catch2_test
     src/tests.cpp
     src/crypto_engine.cpp
     src/utils.cpp
 )
 
-target_include_directories(aestool_tests PRIVATE
+target_include_directories(catch2_test PRIVATE
     ${CRYPTOPP_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(aestool_tests PRIVATE
+target_link_libraries(catch2_test PRIVATE
     ${CRYPTOPP_LIB}
     Threads::Threads
     Catch2::Catch2  # Headers only - we provide custom main with --help support
 )
 
 # Add Catch2 amalgamated source (since we're using Catch2::Catch2 without main)
-target_sources(aestool_tests PRIVATE
+target_sources(catch2_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/catch2/catch_amalgamated.cpp
 )
 
 # Tell catch_amalgamated.cpp to NOT define main() - we provide our own
-target_compile_definitions(aestool_tests PRIVATE
+target_compile_definitions(catch2_test PRIVATE
     CATCH_AMALGAMATED_CUSTOM_MAIN
 )
 
 # Register test with CTest
-add_test(NAME aestool_unit_tests COMMAND aestool_tests)
+add_test(NAME aestool_unit_tests COMMAND catch2_test)
 
 # ------------------------------------------------------------------------------
 # Benchmark Executable
 # ------------------------------------------------------------------------------
 
-add_executable(aestool_bench
+add_executable(benchmark
     src/benchmark.cpp
     src/crypto_engine.cpp
     src/utils.cpp
 )
 
-target_include_directories(aestool_bench PRIVATE
+target_include_directories(benchmark PRIVATE
     ${CRYPTOPP_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(aestool_bench PRIVATE
+target_link_libraries(benchmark PRIVATE
     ${CRYPTOPP_LIB}
     Threads::Threads
 )
@@ -220,20 +220,20 @@ target_link_libraries(aestool_bench PRIVATE
 # ------------------------------------------------------------------------------
 # Compiler-specific optimization flags for benchmark
 if(MSVC)
-    target_compile_options(aestool_bench PRIVATE
+    target_compile_options(benchmark PRIVATE
         /O2     # Maximize speed
         /Oi     # Enable intrinsic functions
         /Ot     # Favor fast code
         /GL     # Whole program optimization (link-time)
     )
-    target_link_options(aestool_bench PRIVATE /LTCG)  # Link-time code generation
+    target_link_options(benchmark PRIVATE /LTCG)  # Link-time code generation
 else()
-    target_compile_options(aestool_bench PRIVATE
+    target_compile_options(benchmark PRIVATE
         -O3
         -march=native
         -mtune=native
     )
-    target_link_options(aestool_bench PRIVATE -flto)
+    target_link_options(benchmark PRIVATE -flto)
 endif()
 
 # Compiler warnings (MUST be after all target definitions)
@@ -249,8 +249,8 @@ if(MSVC)
         /W4
         /permissive-
     )
-    target_compile_options(aestool_tests PRIVATE /W4 /permissive-)
-    target_compile_options(aestool_bench PRIVATE /W4 /permissive-)
+    target_compile_options(catch2_test PRIVATE /W4 /permissive-)
+    target_compile_options(benchmark PRIVATE /W4 /permissive-)
 
 else()
 
@@ -264,7 +264,7 @@ else()
         -Wextra
         -Wpedantic
     )
-    target_compile_options(aestool_tests PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(aestool_bench PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(catch2_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(benchmark PRIVATE -Wall -Wextra -Wpedantic)
 
 endif()

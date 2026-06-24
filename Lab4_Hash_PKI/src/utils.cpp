@@ -70,16 +70,16 @@ std::string to_base64(const std::vector<uint8_t>& data) {
     result.reserve(((len + 2) / 3) * 4);
 
     while (i < len) {
-        uint32_t a = (i < len) ? data[i++] : 0;
-        uint32_t b = (i < len) ? data[i++] : 0;
-        uint32_t c = (i < len) ? data[i++] : 0;
+        size_t left = len - i;
+        uint32_t a = (left > 0) ? data[i++] : 0;
+        uint32_t b = (left > 1) ? data[i++] : 0;
+        uint32_t c = (left > 2) ? data[i++] : 0;
         uint32_t triple = (a << 16) | (b << 8) | c;
 
-        size_t remaining = len - (i - 3);
         result += b64_table[(triple >> 18) & 0x3F];
         result += b64_table[(triple >> 12) & 0x3F];
-        result += (remaining > 1) ? b64_table[(triple >> 6) & 0x3F] : '=';
-        result += (remaining > 2) ? b64_table[triple & 0x3F] : '=';
+        result += (left > 1) ? b64_table[(triple >> 6) & 0x3F] : '=';
+        result += (left > 2) ? b64_table[triple & 0x3F] : '=';
     }
     return result;
 }

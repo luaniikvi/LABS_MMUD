@@ -1,55 +1,84 @@
-# Lab 3 — RSA-OAEP & Hybrid Encryption
+# CryptoLab3 — RSA-OAEP & Hybrid Encryption CLI
 
 ## Overview
 
-This lab implements RSA-OAEP encryption/decryption and hybrid encryption (RSA-OAEP + AES-GCM) using Crypto++.
+CryptoLab3 implements RSA-OAEP encryption/decryption and hybrid encryption (RSA-OAEP + AES-256-GCM) in C++17 using the Crypto++ cryptographic library. It supports RSA-3072 and RSA-4096 key pairs, direct RSA-OAEP for small payloads, automatic hybrid envelope mode for large files, OAEP labels, AAD, JSON-based Known Answer Tests (KAT), statistical performance benchmarking, and cross-platform builds via CMake.
+
+An optional PyQt6 GUI (`gui_qt6.py`) is provided as a bonus extension, calling the same compiled shared library (`rsatool.dll` / `librsatool.so`) through `ctypes`.
 
 ## Features
 
-- **RSA Key Generation**: 3072-bit and 4096-bit keys
-- **RSA-OAEP Encryption**: Using SHA-256 hash and MGF1
-- **Hybrid Encryption**: RSA-OAEP for key wrapping + AES-256-GCM for data
-- **Envelope Format**: JSON header with binary payload
-- **AAD Support**: Additional authenticated data for hybrid mode
-- **NIST KAT Validation**: Known Answer Tests for both RSA and hybrid modes
-- **Comprehensive Negative Testing**: Wrong keys, tampered ciphertext, invalid inputs
-- **Performance Benchmarking**: Statistical analysis with 95% confidence intervals
+* RSA-3072 and RSA-4096 key generation
+* RSA-OAEP encryption/decryption with SHA-256 hash and MGF1
+* Hybrid encryption: RSA-OAEP key wrapping + AES-256-GCM payload encryption
+* Automatic mode selection (direct RSA-OAEP vs hybrid envelope)
+* Optional OAEP label support
+* AAD (Additional Authenticated Data) for hybrid mode
+* Structured envelope format (JSON header + binary payload)
+* PEM and DER key format support
+* NIST KAT (Known Answer Test) runner (`--kat`)
+* Statistical performance benchmarking
+* Catch2 unit tests with per-test PASS/FAIL output
+* Cross-platform build support (MSVC, MinGW64, GCC/Linux)
+* Out-of-source CMake builds enforced
+* Optional PyQt6 GUI bonus
+
+---
 
 ## Dependencies
 
-- C++17 or later
-- CMake 3.15+
-- Crypto++ (provided in `../external/cryptopp`)
-- Catch2 (local amalgamation in `include/catch2/`)
-- nlohmann/json (local header in `include/nlohmann/`)
+| Dependency   | Version               |
+|--------------|-----------------------|
+| C++ Standard | C++17                 |
+| CMake        | 3.15 or newer         |
+| Crypto++     | 8.9                   |
+| GCC (Ubuntu) | 9+ recommended        |
+| MSVC         | Visual Studio 18 2026 |
+| PyQt6        | (optional, for GUI)   |
 
-## Build Instructions
+### External Dependency Layout
+
+Crypto++ must be pre-installed under:
+
+```text
+external/
+└── cryptopp/
+    ├── include/
+    └── lib/
+        ├── libcryptopp.a   (MSYS2 / Linux)
+        └── cryptopp.lib    (MSVC)
+```
+
+---
+
+## Build Commands
+
+### Linux (Ubuntu LTS)
+
+```bash
+cd Lab3_RSA_Hybrid
+mkdir build && cd build
+cmake ..
+cmake --build .
+```
+
+Executables: `build/rsatool`, `build/catch2_test`, `build/benchmark`, `build/librsatool.so`
 
 ### Windows (MSVC)
 
 ```cmd
 cd Lab3_RSA_Hybrid
-mkdir build_msvc
-cd build_msvc
+mkdir build
+cd build
 cmake ..
 cmake --build . --config Release
 ```
 
-### Windows (MinGW/MSYS2)
+Executables: `build\Release\rsatool.exe`, `build\Release\catch2_test.exe`, `build\Release\benchmark.exe`, `build\Release\rsatool.dll`
 
-Open MSYS2 MinGW64 terminal:
+### Windows (MSYS2 / MinGW64)
 
-```bash
-cd Lab3_RSA_Hybrid
-mkdir build_mingw
-cd build_mingw
-cmake ..
-cmake --build .
-```
-
-### Linux (Ubuntu LTS)
-
-```bash
+```cmd
 cd Lab3_RSA_Hybrid
 mkdir build
 cd build
@@ -57,228 +86,199 @@ cmake ..
 cmake --build .
 ```
 
-### Quick Build (PowerShell)
+Executables: `build\rsatool.exe`, `build\catch2_test.exe`, `build\benchmark.exe`, `build\rsatool.dll`
 
-```powershell
-# MSVC (default)
-.\build_lab3.ps1
+### Build Targets
 
-# MinGW
-.\build_lab3.ps1 -Compiler mingw
+| Target       | Description                                       |
+|--------------|---------------------------------------------------|
+| `rsatool`    | Main CLI RSA-OAEP & hybrid encryption tool        |
+| `rsatool_lib`| Shared library (`rsatool.dll` / `.so`) for GUI     |
+| `catch2_test`| Catch2 unit test executable                       |
+| `benchmark`  | Multi-threaded performance benchmark              |
+
+---
+
+## CLI Reference
+
+```text
+rsatool <command> [options]
+
+COMMANDS:
+  keygen              Generate RSA key pair (3072 or 4096 bits)
+  encrypt             RSA-OAEP or hybrid encryption
+  decrypt             RSA-OAEP or hybrid decryption
+
+OPTIONS:
+  --bits <N>          Key size: 3072 (default) or 4096
+  --in <file>         Input file path (binary-safe)
+  --text "..."        Direct UTF-8 text input
+  --out <file>        Output file path (binary-safe)
+  --pub <file>        Public key file (PEM format)
+  --priv <file>       Private key file (PEM format)
+  --pub-der <file>    Public key output in DER format
+  --priv-der <file>   Private key output in DER format
+  --label <str>       Optional OAEP label
+  --aad <file>        Additional Authenticated Data from binary file
+  --aad-text <str>    Additional Authenticated Data as UTF-8 string
+  --encode <type>     Output encoding: hex (default), base64, raw
+  --kat <file.json>   Run Known Answer Tests from JSON vector file
+  --threads <N>       Number of threads (default: 1)
+  --verbose           Enable detailed processing telemetry
 ```
 
-**See [BUILD_GUIDE.md](BUILD_GUIDE.md) for detailed build instructions.**
+---
 
-## Python Qt6 GUI
+## Example CLI Usage
 
-A simple Qt6 GUI is provided that calls the compiled `rsatool` executable (does not duplicate cryptographic logic).
-
-### Installation
+### Show Help
 
 ```bash
-pip install -r requirements.txt
+rsatool --help
 ```
 
-### Run GUI
+### Generate RSA-3072 Key Pair
 
 ```bash
-python gui_qt6.py
-```
-
-### GUI Features
-- **Key Generation**: Generate RSA-3072/4096 key pairs
-- **Encryption**: Encrypt text or files using RSA-OAEP or hybrid mode
-- **Decryption**: Decrypt RSA-OAEP or hybrid envelopes
-- **Hybrid Mode**: Dedicated hybrid encrypt/decrypt with AAD support, envelope inspection, and mode auto-detection
-- **Benchmark**: Run performance benchmarks for RSA key generation, RSA-OAEP, and hybrid encryption with statistical output
-- **Catch2 Tests**: Run the full Catch2 unit test suite including RSA-OAEP, hybrid, negative, encoding, and DER tests
-- **KAT Tests**: Run Known Answer Tests against `rsa_oaep_kats.json` and `hybrid_kats.json` vector files
-- **OAEP Label Support**: Optional label parameter
-- **Background Processing**: Non-blocking crypto operations via QThread
-- **Output Log**: Real-time operation logging
-
-## CLI Usage
-
-### Key Generation
-
-```bash
-# Generate RSA-3072 key pair
 rsatool keygen --bits 3072 --pub pub.pem --priv priv.pem
-
-# Generate RSA-4096 key pair
-rsatool keygen --bits 4096 --pub pub.pem --priv priv.pem
 ```
 
-### Encryption
+### Encrypt Small Message (Direct RSA-OAEP)
 
 ```bash
-# Direct RSA-OAEP encryption (small messages ≤ 382 bytes for RSA-3072)
-rsatool encrypt --in msg.txt --pub pub.pem --out ct.bin
-
-# Encryption from text
 rsatool encrypt --text "Hello, RSA!" --pub pub.pem --out ct.bin
+```
 
-# With OAEP label
+### Encrypt with OAEP Label
+
+```bash
 rsatool encrypt --in msg.txt --pub pub.pem --out ct.bin --label "MyLabel"
+```
 
-# Hybrid encryption (automatic for large files)
+### Encrypt Large File (Auto Hybrid Mode)
+
+```bash
 rsatool encrypt --in large_file.bin --pub pub.pem --out envelope.bin
+```
 
-# Hybrid with AAD
+### Hybrid Encryption with AAD
+
+```bash
 rsatool encrypt --in msg.bin --pub pub.pem --out env.bin --aad-text "metadata"
 ```
 
-### Decryption
+### Decrypt (Auto-detects RSA-OAEP or Hybrid)
 
 ```bash
-# Decrypt (auto-detects RSA-OAEP or hybrid envelope)
 rsatool decrypt --in ct.bin --priv priv.pem --out msg.txt
+```
 
-# Decrypt with label
+### Decrypt with Label
+
+```bash
 rsatool decrypt --in ct.bin --priv priv.pem --out msg.txt --label "MyLabel"
 ```
 
-### Output Encoding
+### Base64 Output
 
 ```bash
-# Display ciphertext in hex (default)
-rsatool encrypt --text "test" --pub pub.pem --encode hex
-
-# Display ciphertext in base64
 rsatool encrypt --text "test" --pub pub.pem --encode base64
-
-# Write raw binary to file
-rsatool encrypt --text "test" --pub pub.pem --out ct.bin --encode raw
 ```
 
-## Running Tests
-
-### Unit Tests & KATs
+### Run NIST KAT Tests
 
 ```bash
-cd build
-ctest -V
+rsatool --kat test_vectors/rsa_oaep_kats.json
 ```
 
-Or run the test executable directly:
+---
+
+## Performance Benchmark
+
+The `benchmark` executable provides statistical benchmarking for RSA key generation, RSA-OAEP encryption/decryption, and hybrid encryption.
+
+### Usage
 
 ```bash
-# Windows
-.\test_lab3.exe
-
-# Linux
-./test_lab3
+benchmark [--threads N] [--iterations N] [--keysize N] [--warm SECS] [--verbose]
 ```
 
-### Known Answer Tests
+### Methodology
 
-KAT vectors are located in `test_vectors/`:
-- `rsa_oaep_kats.json` - RSA-OAEP test vectors
-- `hybrid_kats.json` - Hybrid encryption test vectors
+Per the lab performance protocol:
 
-## Benchmarking
+1. **Warm-up**: 1–2 seconds to stabilize caches
+2. **Block size**: ~1,000 operations per block (keygen, encrypt, decrypt)
+3. **Runs**: 30+ independent timed runs
+4. **Statistics reported**: Mean, Median, Standard Deviation, 95% Confidence Interval, Throughput (MB/s)
 
-```bash
-# Run full benchmark suite
-./benchmark_lab3
-```
+### Benchmarked Operations
 
-The benchmark measures:
-- RSA key generation (3072 vs 4096 bits)
-- RSA-OAEP encryption/decryption latency
-- Hybrid encryption/decryption throughput
-- Statistical metrics: mean, median, std dev, 95% CI
+* RSA-3072 and RSA-4096 key generation
+* RSA-OAEP encryption/decryption (small messages)
+* Hybrid encrypt/decrypt at payload sizes: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB, 100 MiB
 
-Payload sizes tested: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB, 100 MiB
+### Multi-threading
 
-## Hybrid Encryption
+Use `--threads N` to scale across CPU cores. Set to `0` for auto-detection.
 
-### Overview
+---
 
-Hybrid encryption combines the strengths of asymmetric (RSA-OAEP) and symmetric (AES-256-GCM) cryptography. RSA is used only to securely transport a randomly generated AES session key, while the actual payload is encrypted with high-throughput AES-GCM. This architecture eliminates RSA's plaintext-size limitation and provides authenticated encryption for arbitrarily large data.
+## Unit Tests
 
-### Architecture Flow
+Unit tests use [Catch2 v3](https://github.com/catchorg/Catch2) via local amalgamation (headers and source in `include/catch2/`).
 
-```
-ENCRYPTION (Sender):
-  1. Generate random 256-bit AES session key
-  2. Wrap (encrypt) AES key with RSA-OAEP using recipient's public key
-  3. Generate random 96-bit IV (nonce)
-  4. Encrypt payload with AES-256-GCM (key + IV)
-  5. Compute 128-bit GCM authentication tag
-  6. Package into binary envelope: [header_size][JSON header][ciphertext]
+### Test Coverage
 
-DECRYPTION (Recipient):
-  1. Parse envelope → extract wrapped key, IV, tag, AAD, ciphertext
-  2. Unwrap (decrypt) AES key with RSA-OAEP using private key
-  3. Decrypt ciphertext with AES-256-GCM (key + IV + tag)
-  4. Verify GCM authentication tag (rejects tampered data)
-  5. Output plaintext
-```
-
-### Auto-Mode Selection
-
-The tool automatically selects between direct RSA-OAEP and hybrid encryption:
-
-| Condition | Mode Selected |
-|-----------|---------------|
-| Plaintext ≤ max size (318 bytes for RSA-3072) AND no AAD | **Direct RSA-OAEP** |
-| Plaintext > max size | **Hybrid (RSA-OAEP + AES-GCM)** |
-| AAD provided (any plaintext size) | **Hybrid (RSA-OAEP + AES-GCM)** |
-
-Max plaintext sizes:
-- **RSA-3072**: `384 - 2×32 - 2 = 318 bytes`
-- **RSA-4096**: `512 - 2×32 - 2 = 446 bytes`
-
-### AAD (Additional Authenticated Data)
-
-Hybrid mode supports optional AAD — data that is authenticated (integrity-checked) but **not encrypted**. This is useful for binding metadata (e.g., message type, sender ID, protocol version) to the ciphertext without hiding it.
-
-```bash
-# Encrypt with AAD string
-rsatool encrypt --in data.bin --pub pub.pem --out env.bin --aad-text "protocol=v2;sender=alice"
-
-# Encrypt with AAD from file
-rsatool encrypt --in data.bin --pub pub.pem --out env.bin --aad metadata.bin
-```
-
-AAD is stored in the envelope header (base64-encoded). During decryption, the embedded AAD is automatically used for GCM tag verification. If the envelope is tampered with or AAD is modified, decryption fails with an authentication error.
-
-### OAEP Label in Hybrid Mode
-
-The OAEP label is cryptographically bound to the RSA key-wrapping step. If a label is used during encryption, the **same label must be provided during decryption** — otherwise RSA-OAEP unwrapping fails, and the AES key cannot be recovered.
-
-```bash
-# Hybrid with label
-rsatool encrypt --in large.bin --pub pub.pem --out env.bin --label "session-42"
-rsatool decrypt --in env.bin --priv priv.pem --out out.bin --label "session-42"
-```
-
-### Security Properties
-
-| Property | Value |
+| Category | Tests |
 |----------|-------|
-| Key wrapping | RSA-OAEP-3072 (SHA-256, MGF1) |
-| Payload cipher | AES-256-GCM |
-| Session key | 256-bit random (fresh per encryption) |
-| IV / Nonce | 96-bit random (unique per encryption) |
-| Auth tag | 128-bit GCM tag |
-| AAD support | Yes (authenticated, not encrypted) |
-| Confidentiality | IND-CCA2 (via RSA-OAEP) + IND-CPA (via AES-GCM) |
-| Integrity | 128-bit GCM authentication tag |
-| Forward secrecy | Per-message random AES key |
+| **RSA Key Generation** | Valid sizes (3072, 4096), invalid sizes rejected |
+| **RSA-OAEP Encrypt/Decrypt** | Small message, empty message, medium message, label roundtrip |
+| **RSA-OAEP Negative** | Wrong key fails, wrong label fails, tampered ciphertext fails, invalid length rejected |
+| **Hybrid Encrypt/Decrypt** | 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB, empty payload, with AAD |
+| **Hybrid Negative** | Tampered ciphertext → auth failure, tampered header → failure, wrong key → failure |
+| **DER Format** | Public/private key DER roundtrip |
+| **Encoding** | Hex and Base64 roundtrip |
 
-### Performance Characteristics
+---
 
-Hybrid encryption throughput is dominated by AES-GCM performance (fast, hardware-accelerated on modern CPUs). RSA overhead is constant (~384 bytes for key wrapping) regardless of payload size, making hybrid mode efficient for large files:
+## Project Structure
 
-| Payload Size | Typical Throughput | RSA Overhead |
-|-------------|--------------------|-------------|
-| 1 KiB       | ~hundreds of MB/s  | ~384 bytes  |
-| 1 MiB       | ~GB/s (AES-NI)     | ~384 bytes  |
-| 100 MiB     | ~GB/s (AES-NI)     | ~384 bytes  |
+```text
+Lab3_RSA_Hybrid/
+├── CMakeLists.txt              ← Build system (all targets)
+├── gui_qt6.py                  ← Optional PyQt6 GUI (bonus)
+├── include/
+│   ├── catch2/
+│   │   ├── catch_amalgamated.hpp
+│   │   └── catch_amalgamated.cpp
+│   ├── nlohmann/
+│   │   └── json.hpp
+│   └── dll_export.hpp          ← DLL export macros
+├── src/
+│   ├── main.cpp                ← CLI entry point
+│   ├── rsa_engine.cpp          ← RSA-OAEP encrypt/decrypt core
+│   ├── rsa_engine.hpp
+│   ├── hybrid_engine.cpp       ← Hybrid encryption (RSA + AES-GCM)
+│   ├── hybrid_engine.hpp
+│   ├── utils.cpp               ← Hex/Base64/file I/O/KAT runner
+│   ├── utils.hpp
+│   ├── dll_wrapper.cpp         ← C exports for shared library (GUI)
+│   ├── benchmark.cpp           ← Performance benchmark
+│   ├── benchmark.hpp
+│   ├── benchmark_main.cpp      ← Benchmark CLI
+│   └── tests.cpp               ← Catch2 unit tests
+├── test_vectors/
+│   ├── rsa_oaep_kats.json      ← RSA-OAEP KAT vectors
+│   └── hybrid_kats.json        ← Hybrid KAT vectors
+└── build/                      ← Out-of-source build output
+```
 
-### Envelope Binary Format
+---
+
+## Hybrid Encryption Envelope Format
+
+### Envelope Binary Structure
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -299,79 +299,82 @@ Hybrid encryption throughput is dominated by AES-GCM performance (fast, hardware
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### KAT Validation (Hybrid)
+### Auto-Mode Selection
 
-Hybrid KAT vectors are in `test_vectors/hybrid_kats.json` and cover:
-- Various payload sizes: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB
-- Payloads with AAD
-- Binary payloads (raw hex)
+| Condition | Mode Selected |
+|-----------|---------------|
+| Plaintext ≤ max size (318 bytes for RSA-3072) AND no AAD | **Direct RSA-OAEP** |
+| Plaintext > max size | **Hybrid (RSA-OAEP + AES-GCM)** |
+| AAD provided (any plaintext size) | **Hybrid (RSA-OAEP + AES-GCM)** |
 
-Run hybrid KATs:
+### Security Properties
+
+| Property | Value |
+|----------|-------|
+| Key wrapping | RSA-OAEP-3072 (SHA-256, MGF1) |
+| Payload cipher | AES-256-GCM |
+| Session key | 256-bit random (fresh per encryption) |
+| IV / Nonce | 96-bit random (unique per encryption) |
+| Auth tag | 128-bit GCM tag |
+| AAD support | Yes (authenticated, not encrypted) |
+| Confidentiality | IND-CCA2 (via RSA-OAEP) + IND-CPA (via AES-GCM) |
+| Integrity | 128-bit GCM authentication tag |
+
+---
+
+## Known Answer Tests (KAT)
+
+Run the bundled NIST-style vectors:
+
 ```bash
+rsatool --kat test_vectors/rsa_oaep_kats.json
 rsatool --kat test_vectors/hybrid_kats.json
 ```
 
-## Security Properties
+The runner:
+* Parses the JSON vector file
+* Runs each test case (encrypt + decrypt, compare)
+* Prints `PASS` or `FAIL` per case
+* Prints a summary with total / passed / failed counts
 
-### RSA-OAEP
-- **IND-CCA2 secure**: Optimal Asymmetric Encryption Padding
-- **Hash**: SHA-256
-- **MGF**: MGF1 with SHA-256
-- **Max plaintext**: k - 2*hLen - 2 bytes (318 bytes for RSA-3072)
+Coverage includes:
+* RSA-OAEP at various payload sizes
+* Hybrid encryption at sizes: 1 KiB, 4 KiB, 16 KiB, 256 KiB, 1 MiB
+* Payloads with AAD
+* Negative tests (wrong key, tampered data, invalid lengths)
 
-### Negative Testing
+---
 
-The implementation includes comprehensive negative tests:
-- ✅ Wrong key decryption → fails securely (RSA padding error / GCM auth failure)
-- ✅ Tampered ciphertext (RSA) → padding validation failure
-- ✅ Tampered ciphertext (AES-GCM) → authentication tag failure
-- ✅ Tampered envelope header → decryption rejected
-- ✅ Wrong OAEP label → unwrapping failure in both RSA and hybrid modes
-- ✅ Plaintext too large for direct RSA → fails with clear error
-- ✅ Invalid ciphertext length → rejection
-- ✅ Malformed / corrupted PEM keys → parsing failure
+## Python GUI (Bonus)
 
-## Project Structure
+The optional GUI is implemented in `gui_qt6.py` using PyQt6 and `ctypes`. It auto-discovers the built shared library (`rsatool.dll` on Windows, `librsatool.so` on Linux) on startup.
 
+### Requirements
+
+```bash
+pip install PyQt6
 ```
-Lab3_RSA_Hybrid/
-├── CMakeLists.txt              # Build configuration
-├── README.md                   # This file
-├── src/
-│   ├── main.cpp                # CLI tool entry point
-│   ├── rsa_engine.cpp          # RSA-OAEP implementation
-│   ├── rsa_engine.hpp
-│   ├── hybrid_engine.cpp       # Hybrid encryption implementation
-│   ├── hybrid_engine.hpp
-│   ├── utils.cpp               # Utility functions (hex, base64, I/O)
-│   ├── utils.hpp
-│   ├── benchmark.cpp           # Benchmarking implementation
-│   ├── benchmark.hpp
-│   ├── benchmark_main.cpp      # Benchmark executable
-│   └── tests.cpp               # Catch2 unit tests & KATs
-├── include/
-│   ├── catch2/                 # Catch2 amalgamation
-│   └── nlohmann/               # JSON library
-└── test_vectors/
-    ├── rsa_oaep_kats.json      # RSA-OAEP KAT vectors
-    └── hybrid_kats.json        # Hybrid KAT vectors
+
+### Running the GUI
+
+```bash
+python gui_qt6.py
 ```
+
+The GUI provides tabs for: Key Generation, Encryption, Decryption, Hybrid Mode, Benchmark, Unit Tests, and KAT Tests.
+
+---
 
 ## Known Limitations
 
-- Only RSA-3072 and RSA-4096 are supported (per lab requirements)
-- PEM format uses simple Base64 encoding (not full ASN.1/DER parsing)
-- No support for encrypted private keys (password protection)
-- Single-threaded implementation
+1. Only RSA-3072 and RSA-4096 key sizes are supported (per lab requirements)
+2. PEM format uses simple Base64 encoding (not full PKCS#8)
+3. No support for password-protected private keys
+4. Single-threaded implementations
+5. RSA key generation is computationally expensive and may take 30+ seconds for 4096-bit keys
 
-## Report Requirements
-
-See the main project README for report structure and requirements.
-
-## Academic Integrity
-
-This implementation is for educational purposes only. All cryptographic operations use established libraries (Crypto++) and follow NIST standards.
+---
 
 ## License
 
-Educational use only. See project-level licensing.
+This project is provided for educational and laboratory purposes.
